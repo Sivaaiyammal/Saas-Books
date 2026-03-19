@@ -1,0 +1,291 @@
+{
+  "info": {
+    "_postman_id": "b8c2f5f4-74e0-4d8a-9d4d-f0a4f6e7c001",
+    "name": "Anu Textiles - EWayBill v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "JWT-protected backend endpoints for CharteredInfo E-Way Bill flow.\n\nFlow:\n1. Save EWB Settings (one-time setup)\n2. Get Access Token  →  token auto-saved to {{eway_auth_token}}\n3. Generate EWB (single-click)  →  ewb_no auto-saved to {{ewaybill_no}}\n4. Check status / Update vehicle / Cancel / Print / View"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Setup",
+      "item": [
+        {
+          "name": "GET EWB Settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/gst/ewb_settings.php",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gst", "ewb_settings.php"]
+            },
+            "description": "Returns current EWB credentials (password is masked). Returns null if not configured yet."
+          }
+        },
+        {
+          "name": "POST Save EWB Settings",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gstin\":           \"{{gstin}}\",\n  \"username\":        \"{{eway_username}}\",\n  \"ewbpwd\":          \"{{ewb_pwd}}\",\n  \"from_trade_name\": \"Anu's Textiles\",\n  \"from_addr1\":      \"1st Floor, Shop No. 1, No. 139\",\n  \"from_addr2\":      \"Janani Complex, Avinashi Road\",\n  \"from_place\":      \"Tiruppur\",\n  \"from_pincode\":    641603,\n  \"from_state_code\": 33\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gst/ewb_settings.php",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gst", "ewb_settings.php"]
+            },
+            "description": "Save (or update) the company EWB credentials and from-address. Run once before using any generate endpoint.\n\nfrom_state_code: 33=Tamil Nadu, 29=Karnataka, 27=Maharashtra …"
+          }
+        }
+      ]
+    },
+    {
+      "name": "E-Way Bill Flow",
+      "item": [
+        {
+          "name": "1) Get Access Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Auto-save the auth token returned by CharteredInfo",
+                  "var res = pm.response.json();",
+                  "if (res && res.data && res.data.provider_response) {",
+                  "    var pr = res.data.provider_response;",
+                  "    var token = pr.authToken || pr.authtoken",
+                  "               || (pr.data && (pr.data.authToken || pr.data.authtoken));",
+                  "    if (token) {",
+                  "        pm.environment.set('eway_auth_token', token);",
+                  "        console.log('Auth token saved:', token.substring(0, 10) + '...');",
+                  "    } else {",
+                  "        console.warn('Auth token not found in response:', JSON.stringify(pr));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gstin\":    \"{{gstin}}\",\n  \"username\": \"{{eway_username}}\",\n  \"ewbpwd\":   \"{{ewb_pwd}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gst/ewaybill_access_token.php",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gst", "ewaybill_access_token.php"]
+            },
+            "description": "Fetches the CharteredInfo auth token.\n\nThe Tests tab automatically saves the returned token into {{eway_auth_token}} — no manual copy-paste needed."
+          }
+        },
+        {
+          "name": "2a) Generate EWB - Single Click",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Auto-save the generated EWB number",
+                  "var res = pm.response.json();",
+                  "if (res && res.data && res.data.ewb_no) {",
+                  "    pm.environment.set('ewaybill_no', res.data.ewb_no);",
+                  "    console.log('EWB number saved:', res.data.ewb_no);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"voucher_id\":      {{voucher_id}},\n  \"vehicle_no\":      \"TN07AB1234\",\n  \"trans_distance\":  73,\n  \"trans_mode\":      \"1\",\n  \"vehicle_type\":    \"R\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gst/ewaybill_generate.php",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gst", "ewaybill_generate.php"]
+            },
+            "description": "Single-click generate. The backend automatically:\n  1. Loads EWB credentials from ewb_settings table\n  2. Gets an access token from CharteredInfo\n  3. Builds the full EWB payload from the voucher + item DB records\n  4. Calls GENEWAYBILL on CharteredInfo\n  5. Stores the EWB number in ewaybill_log\n\ntrans_mode: 1=Road, 2=Rail, 3=Air, 4=Ship\nvehicle_type: R=Regular, O=ODC\n\nThe Tests tab auto-saves the EWB number into {{ewaybill_no}}."
+          }
+        },
+        {
+          "name": "2b) Generate EWB - Manual (Advanced)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gstin\":     \"{{gstin}}\",\n  \"ewbpwd\":    \"{{ewb_pwd}}\",\n  \"authtoken\": \"{{eway_auth_token}}\",\n  \"payload\": {\n    \"supplyType\":        \"O\",\n    \"subSupplyType\":     \"1\",\n    \"subSupplyDesc\":     \"\",\n    \"docType\":           \"INV\",\n    \"docNo\":             \"EWB-A-091294\",\n    \"docDate\":           \"03/02/2026\",\n    \"fromGstin\":         \"{{gstin}}\",\n    \"fromTrdName\":       \"JUST BUY PC\",\n    \"fromAddr1\":         \"1st Floor, Shop No. 1, No. 139\",\n    \"fromAddr2\":         \"Janani Complex, Avinashi Road\",\n    \"fromPlace\":         \"Above Specsmakers, Tiruppur\",\n    \"fromPincode\":       641603,\n    \"actFromStateCode\":  33,\n    \"fromStateCode\":     33,\n    \"toGstin\":           \"33LPRPS0354C1ZO\",\n    \"toTrdName\":         \"12-H, Manimekalai Street\",\n    \"toAddr1\":           \"MANIMEKALAI STREET\",\n    \"toAddr2\":           \"Kumarapalayam\",\n    \"toPlace\":           \"Namakkal\",\n    \"toPincode\":         638183,\n    \"actToStateCode\":    33,\n    \"toStateCode\":       33,\n    \"transactionType\":   4,\n    \"otherValue\":        \"\",\n    \"totalValue\":        5000,\n    \"cgstValue\":         75,\n    \"sgstValue\":         75,\n    \"igstValue\":         0,\n    \"cessValue\":         0,\n    \"cessNonAdvolValue\": 0,\n    \"totInvValue\":       5150,\n    \"transporterId\":     \"\",\n    \"transporterName\":   \"\",\n    \"transDocNo\":        \"\",\n    \"transMode\":         \"1\",\n    \"transDistance\":     \"73\",\n    \"transDocDate\":      \"\",\n    \"vehicleNo\":         \"PVC1234\",\n    \"vehicleType\":       \"R\",\n    \"itemList\": [\n      {\n        \"productName\":   \"BLAZER-1\",\n        \"productDesc\":   \"BLAZER-1\",\n        \"hsnCode\":       4421,\n        \"quantity\":      25,\n        \"qtyUnit\":       \"NOS\",\n        \"cgstRate\":      1.5,\n        \"sgstRate\":      1.5,\n        \"igstRate\":      0,\n        \"cessRate\":      0,\n        \"cessNonadvol\":  0,\n        \"taxableAmount\": 5000\n      }\n    ]\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gst/ewaybill_generate.php",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gst", "ewaybill_generate.php"]
+            },
+            "description": "Advanced / pass-through mode. Supply your own full payload + authtoken.\nUse this for custom testing or when the DB-based single-click mode is not suitable.\n\nRequires: gstin, ewbpwd, authtoken, payload"
+          }
+        },
+        {
+          "name": "3a) Check EWB Status - by Voucher ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/gst/ewaybill_generate.php?voucher_id={{voucher_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gst", "ewaybill_generate.php"],
+              "query": [
+                { "key": "voucher_id", "value": "{{voucher_id}}" }
+              ]
+            },
+            "description": "Check if an EWB has been generated for a given voucher. Returns is_expired flag."
+          }
+        },
+        {
+          "name": "3b) Check EWB Status - by EWB No",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/gst/ewaybill_generate.php?ewb_no={{ewaybill_no}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gst", "ewaybill_generate.php"],
+              "query": [
+                { "key": "ewb_no", "value": "{{ewaybill_no}}" }
+              ]
+            },
+            "description": "Fetch EWB log record by EWB number."
+          }
+        },
+        {
+          "name": "4) Update Vehicle - Part B",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ewb_no\":           \"{{ewaybill_no}}\",\n  \"vehicle_no\":       \"TN07XY9999\",\n  \"transporter_id\":   \"\",\n  \"transporter_name\": \"\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gst/ewaybill_generate.php",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gst", "ewaybill_generate.php"]
+            },
+            "description": "Part-B update: change vehicle number or transporter on an active (non-expired) EWB."
+          }
+        },
+        {
+          "name": "5) Cancel E-Way Bill",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gstin\":    \"{{gstin}}\",\n  \"username\": \"{{eway_username}}\",\n  \"authtoken\": \"{{eway_auth_token}}\",\n  \"payload\": {\n    \"ewbNo\":         \"{{ewaybill_no}}\",\n    \"cancelRsnCode\": \"2\",\n    \"cancelRmrk\":    \"for testing\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gst/ewaybill_cancel.php",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gst", "ewaybill_cancel.php"]
+            },
+            "description": "Cancel an active E-Way Bill.\n\ncancelRsnCode:\n  1 = Duplicate\n  2 = Order Cancelled\n  3 = Data Entry Mistake\n  4 = Others"
+          }
+        },
+        {
+          "name": "6) Print E-Way Bill",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/gst/ewaybill_print.php?gstin={{gstin}}&username={{eway_username}}&authtoken={{eway_auth_token}}&ewbNo={{ewaybill_no}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gst", "ewaybill_print.php"],
+              "query": [
+                { "key": "gstin",     "value": "{{gstin}}" },
+                { "key": "username",  "value": "{{eway_username}}" },
+                { "key": "authtoken", "value": "{{eway_auth_token}}" },
+                { "key": "ewbNo",     "value": "{{ewaybill_no}}" }
+              ]
+            },
+            "description": "Fetch printable EWB data from CharteredInfo."
+          }
+        },
+        {
+          "name": "7a) View E-Way Bill - by EWB No",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/gst/ewaybill_view.php?ewb_no={{ewaybill_no}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gst", "ewaybill_view.php"],
+              "query": [
+                { "key": "ewb_no", "value": "{{ewaybill_no}}" }
+              ]
+            },
+            "description": "Returns structured E-Way Bill data (Header, PART-A, PART-B) from the local DB — no CharteredInfo call needed.\n\nResponse sections:\n  header  → EWB No, dates, generated-by, validity, status, is_expired\n  part_a  → Supplier GSTIN/name, place of dispatch, recipient GSTIN/name, place of delivery, document no/date, transaction type, value of goods, HSN code, reason for transport, transporter\n  part_b  → Mode, vehicle no, from, entered date/by, distance, portal\n  cancel  → Cancelled-at and reason (present only when status = cancelled)"
+          }
+        },
+        {
+          "name": "7b) View E-Way Bill - by Voucher ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/gst/ewaybill_view.php?voucher_id={{voucher_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "gst", "ewaybill_view.php"],
+              "query": [
+                { "key": "voucher_id", "value": "{{voucher_id}}" }
+              ]
+            },
+            "description": "Same as 7a but looks up the latest EWB by voucher ID instead of the EWB number.\n\nUseful when you have the sales voucher ID and want to fetch the associated EWB view without knowing the EWB number."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost/anu-s-textiles/backend"
+    }
+  ]
+}

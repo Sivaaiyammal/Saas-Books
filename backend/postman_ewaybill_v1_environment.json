@@ -1,0 +1,69 @@
+{
+  "id": "8f5f3c0a-daf9-4a11-b161-4d69565d44f1",
+  "name": "Anu Textiles - EWayBill v1 Env",
+  "values": [
+    {
+      "key": "base_url",
+      "value": "http://localhost/anu-s-textiles/backend",
+      "enabled": true,
+      "description": "Backend base URL"
+    },
+    {
+      "key": "jwt_access_token",
+      "value": "",
+      "enabled": true,
+      "description": "Your app JWT token (from login API). Paste here after logging in."
+    },
+    {
+      "key": "ewb_aspid",
+      "value": "1787163325",
+      "enabled": true,
+      "description": "CharteredInfo ASP ID"
+    },
+    {
+      "key": "ewb_asppassword",
+      "value": "Ray241100!",
+      "enabled": true,
+      "description": "CharteredInfo ASP password"
+    },
+    {
+      "key": "gstin",
+      "value": "33AAIFE9454A1ZN",
+      "enabled": true,
+      "description": "Company GSTIN"
+    },
+    {
+      "key": "eway_username",
+      "value": "earnestmin_API_buy",
+      "enabled": true,
+      "description": "EWB portal username"
+    },
+    {
+      "key": "ewb_pwd",
+      "value": "eway@EMTS@123",
+      "enabled": true,
+      "description": "EWB portal password"
+    },
+    {
+      "key": "eway_auth_token",
+      "value": "",
+      "enabled": true,
+      "description": "Auto-filled by '1) Get Access Token' Tests script"
+    },
+    {
+      "key": "ewaybill_no",
+      "value": "",
+      "enabled": true,
+      "description": "Auto-filled by '2a) Generate EWB - Single Click' Tests script"
+    },
+    {
+      "key": "voucher_id",
+      "value": "1",
+      "enabled": true,
+      "description": "DB voucher ID to generate EWB for (single-click mode)"
+    }
+  ],
+  "_postman_variable_scope": "environment",
+  "_postman_exported_at": "2026-02-19T00:00:00.000Z",
+  "_postman_exported_using": "Claude"
+}
