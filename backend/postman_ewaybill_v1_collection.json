@@ -41,7 +41,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"gstin\":           \"{{gstin}}\",\n  \"username\":        \"{{eway_username}}\",\n  \"ewbpwd\":          \"{{ewb_pwd}}\",\n  \"from_trade_name\": \"Anu's Textiles\",\n  \"from_addr1\":      \"1st Floor, Shop No. 1, No. 139\",\n  \"from_addr2\":      \"Janani Complex, Avinashi Road\",\n  \"from_place\":      \"Tiruppur\",\n  \"from_pincode\":    641603,\n  \"from_state_code\": 33\n}",
+              "raw": "{\n  \"gstin\":           \"{{gstin}}\",\n  \"username\":        \"{{eway_username}}\",\n  \"ewbpwd\":          \"{{ewb_pwd}}\",\n  \"from_trade_name\": \"Saas Books\",\n  \"from_addr1\":      \"1st Floor, Shop No. 1, No. 139\",\n  \"from_addr2\":      \"Janani Complex, Avinashi Road\",\n  \"from_place\":      \"Tiruppur\",\n  \"from_pincode\":    641603,\n  \"from_state_code\": 33\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {

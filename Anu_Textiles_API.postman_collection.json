@@ -1,6 +1,6 @@
 {
   "info": {
-    "name": "Anu's Textiles API",
+    "name": "Saas Books API",
     "description": "Sales Order → Delivery Note → Sales Invoice flow",
     "_postman_id": "anu-textiles-v1",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"

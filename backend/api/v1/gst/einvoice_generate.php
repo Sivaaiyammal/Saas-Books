@@ -127,7 +127,7 @@ try {
 
         // Company details (should come from settings)
         $companyGstin = $input['company_gstin'] ?? '29AABCU9603R1ZM'; // Example
-        $companyName = $input['company_name'] ?? "Anu's Textiles";
+        $companyName = $input['company_name'] ?? "Saas Books";
         $companyAddress = $input['company_address'] ?? 'Bangalore, Karnataka';
         $companyState = $input['company_state'] ?? 'Karnataka';
         $companyStateCode = $input['company_state_code'] ?? '29';

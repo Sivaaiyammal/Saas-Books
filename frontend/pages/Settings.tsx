@@ -152,7 +152,7 @@ const Settings: React.FC = () => {
                                         value={formData.from_trade_name}
                                         onChange={handleChange}
                                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
-                                        placeholder="e.g. Anu's Textiles"
+                                        placeholder="e.g. Saas Books"
                                     />
                                 </div>
 

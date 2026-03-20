@@ -1,4 +1,4 @@
-# Anu's Textiles Backend API 🧵
+# Saas Books Backend API
 
 > A secure, production-ready REST API built with PHP, PDO, and JWT authentication for managing a textiles business.
 
@@ -29,7 +29,7 @@
 
 ## 🎯 Overview
 
-This backend API provides a complete solution for managing a textiles business, including:
+This backend API provides a complete solution for managing a business ERP platform, including:
 - User authentication and authorization
 - Product and inventory management
 - Sales tracking and reporting
@@ -1320,15 +1320,15 @@ When reporting issues, include:
 
 **Proprietary License**
 
-Copyright © 2024 Anu's Textiles. All rights reserved.
+Copyright © 2024 Saas Books. All rights reserved.
 
-This software and associated documentation files are proprietary and confidential. Unauthorized copying, distribution, modification, or use of this software is strictly prohibited without explicit written permission from Anu's Textiles.
+This software and associated documentation files are proprietary and confidential. Unauthorized copying, distribution, modification, or use of this software is strictly prohibited without explicit written permission from Saas Books.
 
 ---
 
 ## 👥 Credits
 
-**Developed by:** Anu's Textiles Development Team
+**Developed by:** Saas Books Development Team
 
 **Built with:**
 - PHP 7.4+

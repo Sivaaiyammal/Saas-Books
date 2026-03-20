@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "Anu's Textiles API",
-    "description": "Complete API collection for testing Anu's Textiles Backend",
+    "name": "Saas Books API",
+    "description": "Complete API collection for testing Saas Books Backend",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -3043,7 +3043,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"voucher_id\": {{CREATED_INVOICE_ID}},\n  \"company_gstin\": \"29AABCU9603R1ZM\",\n  \"company_name\": \"Anu's Textiles\",\n  \"company_address\": \"Bangalore, Karnataka\",\n  \"company_state\": \"Karnataka\",\n  \"company_state_code\": \"29\"\n}"
+              "raw": "{\n  \"voucher_id\": {{CREATED_INVOICE_ID}},\n  \"company_gstin\": \"29AABCU9603R1ZM\",\n  \"company_name\": \"Saas Books\",\n  \"company_address\": \"Bangalore, Karnataka\",\n  \"company_state\": \"Karnataka\",\n  \"company_state_code\": \"29\"\n}"
             },
             "url": {
               "raw": "{{BASE_URL}}/gst/einvoice_generate.php",

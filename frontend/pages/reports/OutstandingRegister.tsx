@@ -1082,7 +1082,7 @@ const OutstandingReport: React.FC = () => {
                   <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6">
                     <div>
                       <h2 className="text-2xl font-black uppercase tracking-tighter">
-                        Anush Textiles
+                        Saas Books
                       </h2>
                       <p className="font-bold text-slate-600">
                         P. N Road, Tirupur - 641602

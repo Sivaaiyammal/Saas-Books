@@ -10,7 +10,7 @@
  *   "gstin":           "33AAIFE9454A1ZN",
  *   "username":        "earnestmin_API_buy",
  *   "ewbpwd":          "eway@EMTS@123",
- *   "from_trade_name": "Anu's Textiles",
+ *   "from_trade_name": "Saas Books",
  *   "from_addr1":      "123, Main Road",
  *   "from_addr2":      "Near Bus Stand",
  *   "from_place":      "Tiruppur",

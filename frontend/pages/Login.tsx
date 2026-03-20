@@ -53,7 +53,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="mb-8 flex items-center gap-4 relative z-10">
         <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center font-black text-white text-3xl shadow-2xl shadow-indigo-200">A</div>
         <div className="flex flex-col">
-          <span className="font-black text-2xl text-slate-900 tracking-tight leading-none uppercase">Anush Textiles</span>
+          <span className="font-black text-2xl text-slate-900 tracking-tight leading-none uppercase">Saas Books</span>
           <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mt-1">Billing Software</span>
         </div>
       </div>
@@ -85,7 +85,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-14 pr-6 py-4 bg-slate-50/50 border border-slate-200 rounded-2xl text-slate-900 focus:outline-none focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 focus:bg-white transition-all font-bold text-sm"
-                  placeholder="admin@anutextiles.com"
+                  placeholder="admin@saasbooks.com"
                 />
               </div>
             </div>
@@ -153,7 +153,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </div>
       </div>
       <div className="mt-8 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] relative z-10">
-        © 2026 Anush Textiles Enterprise. Built for Excellence.
+        © 2026 Saas Books Enterprise. Built for Excellence.
       </div>
     </div>
   );

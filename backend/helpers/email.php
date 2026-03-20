@@ -24,7 +24,7 @@ class EmailHelper {
             // Sender
             $mail->setFrom(
                 $_ENV['MAIL_FROM'] ?? 'noreply@anutextiles.com',
-                $_ENV['MAIL_FROM_NAME'] ?? "Anu's Textiles"
+                $_ENV['MAIL_FROM_NAME'] ?? "Saas Books"
             );
 
             // Encoding
@@ -59,7 +59,7 @@ class EmailHelper {
 
     public static function sendPasswordReset($email, $name, $resetToken) {
         $resetUrl = ($_ENV['APP_URL'] ?? 'http://localhost') . '/reset-password.html?token=' . $resetToken;
-        $appName = $_ENV['APP_NAME'] ?? "Anu's Textiles";
+        $appName = $_ENV['APP_NAME'] ?? "Saas Books";
 
         $subject = "Password Reset Request - {$appName}";
 
@@ -187,7 +187,7 @@ class EmailHelper {
     }
 
     public static function sendWelcomeEmail($email, $name) {
-        $appName = $_ENV['APP_NAME'] ?? "Anu's Textiles";
+        $appName = $_ENV['APP_NAME'] ?? "Saas Books";
         $subject = "Welcome to {$appName}!";
 
         $body = "
