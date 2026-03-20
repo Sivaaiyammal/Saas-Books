@@ -45,9 +45,21 @@ try {
     }
 
     $stmt = $pdo->prepare("
-        SELECT id, name, email, password, phone, role, status, created_at
-        FROM users
-        WHERE email = ?
+        SELECT
+            u.id,
+            u.name,
+            u.email,
+            u.password,
+            u.phone,
+            u.company_id,
+            u.role_id,
+            COALESCE(r.name, u.role, 'user') AS role,
+            u.status,
+            u.created_at
+        FROM users u
+        LEFT JOIN roles r ON r.id = u.role_id
+        WHERE u.email = ?
+        LIMIT 1
     ");
 
     $stmt->execute([$email]);
@@ -67,8 +79,22 @@ try {
     $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
     $stmt->execute([$user['id']]);
 
-    $accessToken = JWTHelper::generateToken($user['id'], $user['email'], $user['role'], false);
-    $refreshToken = JWTHelper::generateToken($user['id'], $user['email'], $user['role'], true);
+    $accessToken = JWTHelper::generateToken(
+        $user['id'],
+        $user['email'],
+        $user['role'],
+        false,
+        $user['company_id'] ?? null,
+        $user['role_id'] ?? null
+    );
+    $refreshToken = JWTHelper::generateToken(
+        $user['id'],
+        $user['email'],
+        $user['role'],
+        true,
+        $user['company_id'] ?? null,
+        $user['role_id'] ?? null
+    );
 
     unset($user['password']);
 

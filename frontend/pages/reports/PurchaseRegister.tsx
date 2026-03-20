@@ -715,7 +715,7 @@ const PurchaseRegister: React.FC = () => {
                       <div className="w-12 h-12 bg-indigo-900 rounded-lg flex items-center justify-center">
                         <span className="text-amber-400 font-black text-xl">{(businessDetails?.from_trade_name || 'A')[0]}</span>
                       </div>
-                      <span className="text-indigo-900 font-black text-lg tracking-tight uppercase">{businessDetails?.from_trade_name || 'ANUSH TEXTILES'}</span>
+                      <span className="text-indigo-900 font-black text-lg tracking-tight uppercase">{businessDetails?.from_trade_name || 'SAAS BOOKS'}</span>
                     </div>
 
                     {/* Invoice Title & Date */}
@@ -740,7 +740,7 @@ const PurchaseRegister: React.FC = () => {
                     {/* Bill From (Company) */}
                     <div>
                       <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-2">Bill From</p>
-                      <p className="font-bold text-slate-900">{businessDetails?.from_trade_name || 'Anush Textiles'}</p>
+                      <p className="font-bold text-slate-900">{businessDetails?.from_trade_name || 'Saas Books'}</p>
                       <p className="text-sm text-slate-600">{businessDetails?.from_addr1}, {businessDetails?.from_addr2}</p>
                       <p className="text-sm text-slate-600">{businessDetails?.from_place} - {businessDetails?.from_pincode}</p>
                       {/* <p className="text-sm text-slate-600">Tirupur - 641602</p> */}

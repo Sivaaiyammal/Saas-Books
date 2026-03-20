@@ -203,7 +203,7 @@ const OutstandingTemplate = forwardRef<HTMLDivElement, OutstandingTemplateProps>
                                         </p>
                                     </div>
                                     <div className="p-4 flex flex-col justify-end items-center">
-                                        <p className="text-[10px] mb-8 uppercase font-bold text-slate-900">For {businessDetails?.from_trade_name || 'Anush Textiles'}</p>
+                                        <p className="text-[10px] mb-8 uppercase font-bold text-slate-900">For {businessDetails?.from_trade_name || 'Saas Books'}</p>
                                         <p className="text-[10px] font-black border-t border-slate-900 pt-1 w-full text-center uppercase tracking-widest">Authorised Signature</p>
                                     </div>
                                 </div>

@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
+require_once __DIR__ . '/../../../helpers/auth.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -20,14 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 try {
     $user = AuthMiddleware::authenticate();
 
-    $stmt = $pdo->prepare("
-        SELECT id, name, email, phone, role, status, created_at, last_login
-        FROM users
-        WHERE id = ?
-    ");
-
-    $stmt->execute([$user['id']]);
-    $userData = $stmt->fetch();
+    $userData = AuthHelper::getUserAuthContext($pdo, $user['id']);
 
     if (!$userData) {
         ApiResponse::notFound('User not found');

@@ -345,7 +345,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
               </div>
               <div className="w-[120px] p-3 flex flex-col items-center justify-center bg-slate-50/30">
                 <QRCodeSVG
-                  value={`upi://pay?pa=anushtextiles@tmb&pn=${businessDetails?.from_trade_name || 'Anush Textiles'}&am=${netAmount}&cu=INR`}
+                  value={`upi://pay?pa=anushtextiles@tmb&pn=${businessDetails?.from_trade_name || 'Saas Books'}&am=${netAmount}&cu=INR`}
                   size={75}
                   level="L"
                   includeMargin={false}
@@ -402,7 +402,7 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
             </div>
             {/* Signature */}
             <div className="flex flex-col justify-end items-center p-3">
-              <p className="mb-8 text-xs">For <span className="font-black text-xs">{businessDetails?.from_trade_name || 'Anush Textiles'}</span></p>
+              <p className="mb-8 text-xs">For <span className="font-black text-xs">{businessDetails?.from_trade_name || 'Saas Books'}</span></p>
               <p className="font-bold text-xs">Authorised Signature</p>
             </div>
           </div>

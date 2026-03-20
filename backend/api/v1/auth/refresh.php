@@ -19,6 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/jwt.php';
+require_once __DIR__ . '/../../../helpers/auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     ApiResponse::error('Method not allowed', 405);
@@ -54,23 +55,17 @@ try {
     }
 
     // Check if user still exists and is active
-    $stmt = $pdo->prepare("
-        SELECT id, name, email, role, status
-        FROM users
-        WHERE id = ? AND status = 'active'
-    ");
-    $stmt->execute([$decoded->sub]);
-    $user = $stmt->fetch();
+    $user = AuthHelper::getUserAuthContext($pdo, $decoded->sub);
 
-    if (!$user) {
+    if (!$user || $user['status'] !== 'active') {
         ApiResponse::unauthorized('User not found or inactive. Please login again.');
     }
 
     // Generate new access token
-    $newAccessToken = JWTHelper::generateToken($user['id'], $user['email'], $user['role'], false);
+    $newAccessToken = JWTHelper::generateToken($user['id'], $user['email'], $user['role'], false, $user['company_id'] ?? null, $user['role_id'] ?? null);
 
     // Optionally generate new refresh token (token rotation for security)
-    $newRefreshToken = JWTHelper::generateToken($user['id'], $user['email'], $user['role'], true);
+    $newRefreshToken = JWTHelper::generateToken($user['id'], $user['email'], $user['role'], true, $user['company_id'] ?? null, $user['role_id'] ?? null);
 
     ApiResponse::success([
         'tokens' => [

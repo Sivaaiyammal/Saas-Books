@@ -188,7 +188,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
               {loadingUser ? <Loader2 size={16} className="animate-spin" /> : (user?.name?.[0] || 'A')}
             </div>
             <div className={`flex flex-col transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-              <span className="font-black text-lg text-slate-900 tracking-tight leading-none uppercase">ANUSH ERP</span>
+              <span className="font-black text-lg text-slate-900 tracking-tight leading-none uppercase">SAAS BOOKS</span>
               <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mt-0.5 whitespace-nowrap">Billing Software</span>
             </div>
           </div>
@@ -300,7 +300,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
               <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-white text-xs shadow-lg shadow-indigo-100 group-active:scale-95 transition-transform">
                 {user?.name?.[0] || 'A'}
               </div>
-              <span className="font-black text-sm text-slate-900 tracking-tighter uppercase whitespace-nowrap">ANUSH ERP</span>
+              <span className="font-black text-sm text-slate-900 tracking-tighter uppercase whitespace-nowrap">SAAS BOOKS</span>
             </div>
 
             <div className="relative group hidden sm:block">

@@ -249,7 +249,7 @@ const QuotationTemplate = forwardRef<HTMLDivElement, QuotationTemplateProps>(
                             <span>₹{netAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex flex-col justify-end items-center p-3">
-                            <p className="mb-8 text-xs">For <span className="font-black text-xs">{businessDetails?.from_trade_name || 'Anush Textiles'}</span></p>
+                            <p className="mb-8 text-xs">For <span className="font-black text-xs">{businessDetails?.from_trade_name || 'Saas Books'}</span></p>
                             <p className="font-bold text-xs">Authorised Signature</p>
                         </div>
                     </div>

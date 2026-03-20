@@ -21,7 +21,7 @@ class JWTHelper {
         }
     }
 
-    public static function generateToken($userId, $email, $role = 'user', $isRefresh = false) {
+    public static function generateToken($userId, $email, $role = 'user', $isRefresh = false, $companyId = null, $roleId = null) {
         self::init();
 
         $issuedAt = time();
@@ -33,6 +33,8 @@ class JWTHelper {
             'iss' => $_SERVER['HTTP_HOST'] ?? 'localhost',
             'sub' => $userId,
             'email' => $email,
+            'company_id' => $companyId,
+            'role_id' => $roleId,
             'role' => $role,
             'type' => $isRefresh ? 'refresh' : 'access'
         ];
@@ -100,8 +102,22 @@ class JWTHelper {
             ];
         }
 
-        $newAccessToken = self::generateToken($decoded->sub, $decoded->email, $decoded->role, false);
-        $newRefreshToken = self::generateToken($decoded->sub, $decoded->email, $decoded->role, true);
+        $newAccessToken = self::generateToken(
+            $decoded->sub,
+            $decoded->email,
+            $decoded->role,
+            false,
+            $decoded->company_id ?? null,
+            $decoded->role_id ?? null
+        );
+        $newRefreshToken = self::generateToken(
+            $decoded->sub,
+            $decoded->email,
+            $decoded->role,
+            true,
+            $decoded->company_id ?? null,
+            $decoded->role_id ?? null
+        );
 
         return [
             'success' => true,

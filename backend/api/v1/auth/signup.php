@@ -51,6 +51,11 @@ try {
     $email = AuthHelper::sanitizeEmail($input['email']);
     $password = $input['password'];
     $phone = Validator::sanitize($input['phone'] ?? '');
+    $companyName = trim(strip_tags($input['company_name'] ?? ($name . ' Company')));
+
+    if ($companyName === '') {
+        $companyName = $name . ' Company';
+    }
 
     if (!AuthHelper::isStrongPassword($password)) {
         ApiResponse::validationError([
@@ -66,22 +71,44 @@ try {
     }
 
     $hashedPassword = AuthHelper::hashPassword($password);
+    $pdo->beginTransaction();
+
+    $companyCode = AuthHelper::generateCompanyCode($pdo);
 
     $stmt = $pdo->prepare("
-        INSERT INTO users (name, email, password, phone, role, status, created_at)
-        VALUES (?, ?, ?, ?, 'user', 'active', NOW())
+        INSERT INTO companies (code, name, email, phone, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 'active', NOW(), NOW())
+    ");
+    $stmt->execute([$companyCode, $companyName, $email, $phone ?: null]);
+    $companyId = (int)$pdo->lastInsertId();
+
+    $permissionIds = AuthHelper::ensurePermissions($pdo);
+    $roleIds = AuthHelper::ensureCompanyRoles($pdo, $companyId);
+    AuthHelper::assignDefaultRolePermissions($pdo, $roleIds, $permissionIds);
+
+    $ownerRoleId = $roleIds['owner'] ?? null;
+
+    $stmt = $pdo->prepare("
+        INSERT INTO users (name, email, password, phone, company_id, role_id, role, status, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'admin', 'active', NOW())
     ");
 
-    $stmt->execute([$name, $email, $hashedPassword, $phone]);
+    $stmt->execute([$name, $email, $hashedPassword, $phone, $companyId, $ownerRoleId]);
 
     $userId = $pdo->lastInsertId();
 
-    $accessToken = JWTHelper::generateToken($userId, $email, 'user', false);
-    $refreshToken = JWTHelper::generateToken($userId, $email, 'user', true);
+    $stmt = $pdo->prepare("
+        INSERT INTO company_users (company_id, user_id, role_id, role, is_default, status, created_at, updated_at)
+        VALUES (?, ?, ?, 'owner', 1, 'active', NOW(), NOW())
+    ");
+    $stmt->execute([$companyId, $userId, $ownerRoleId]);
 
-    $stmt = $pdo->prepare("SELECT id, name, email, phone, role, status, created_at FROM users WHERE id = ?");
-    $stmt->execute([$userId]);
-    $user = $stmt->fetch();
+    $accessToken = JWTHelper::generateToken($userId, $email, 'owner', false, $companyId, $ownerRoleId);
+    $refreshToken = JWTHelper::generateToken($userId, $email, 'owner', true, $companyId, $ownerRoleId);
+
+    $pdo->commit();
+
+    $user = AuthHelper::getUserAuthContext($pdo, $userId);
 
     ApiResponse::created([
         'user' => $user,
@@ -94,9 +121,15 @@ try {
     ], 'User registered successfully');
 
 } catch (PDOException $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     error_log("Signup error: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
     ApiResponse::serverError('Registration failed. Please try again.');
 } catch (Exception $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     error_log("Signup exception: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
     ApiResponse::serverError('An unexpected error occurred');
 }

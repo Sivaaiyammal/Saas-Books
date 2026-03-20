@@ -3,10 +3,13 @@
 const getApiBaseUrl = () => {
   try {
     if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-      return (import.meta as any).env.VITE_API_BASE_URL || 'https://anushtextiles.com/backend/api/v1';
+      return (import.meta as any).env.VITE_API_BASE_URL || `${window.location.origin}/backend/api/v1`;
     }
   } catch (e) { }
-  return 'https://anushtextiles.com/backend/api/v1';
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/backend/api/v1`;
+  }
+  return '/backend/api/v1';
 };
 
 const API_BASE_URL = getApiBaseUrl();

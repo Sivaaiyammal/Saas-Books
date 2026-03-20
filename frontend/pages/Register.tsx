@@ -71,7 +71,7 @@ const Register: React.FC<RegisterProps> = ({ onLogin }) => {
         <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center font-black text-white text-3xl shadow-2xl shadow-indigo-200">A</div>
         <div className="flex flex-col text-left">
           <span className="font-black text-2xl text-slate-900 tracking-tight uppercase leading-none">Join Enterprise</span>
-          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mt-1">Anu's Textiles ERP</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mt-1">Saas Books ERP</span>
         </div>
       </div>
 
@@ -210,7 +210,7 @@ const Register: React.FC<RegisterProps> = ({ onLogin }) => {
         </div>
       </div>
       <div className="mt-8 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] relative z-10">
-        © 2024 Anu's Textiles Enterprise. Built for Excellence.
+        © 2024 Saas Books Enterprise. Built for Excellence.
       </div>
     </div>
   );

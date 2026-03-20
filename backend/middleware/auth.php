@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../helpers/jwt.php';
 require_once __DIR__ . '/../helpers/apiResponse.php';
 require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../helpers/auth.php';
 
 class AuthMiddleware {
 
@@ -27,23 +28,14 @@ class AuthMiddleware {
         global $pdo;
 
         try {
-            $stmt = $pdo->prepare("
-                SELECT id, name, email, role, status, created_at
-                FROM users
-                WHERE id = ? AND status = 'active'
-            ");
+            $user = AuthHelper::getUserAuthContext($pdo, $decoded->sub);
 
-            $stmt->execute([$decoded->sub]);
-            $user = $stmt->fetch();
-
-            if (!$user) {
+            if (!$user || $user['status'] !== 'active') {
                 ApiResponse::unauthorized('User not found or inactive');
             }
 
             if ($requiredRole) {
-                require_once __DIR__ . '/../helpers/auth.php';
-
-                if (!AuthHelper::checkPermission($user['role'], $requiredRole)) {
+                if (!AuthHelper::checkPermission($pdo, $user['id'], $requiredRole)) {
                     ApiResponse::forbidden('Insufficient permissions');
                 }
             }
@@ -77,16 +69,9 @@ class AuthMiddleware {
         global $pdo;
 
         try {
-            $stmt = $pdo->prepare("
-                SELECT id, name, email, role, status, created_at
-                FROM users
-                WHERE id = ? AND status = 'active'
-            ");
+            $user = AuthHelper::getUserAuthContext($pdo, $decoded->sub);
 
-            $stmt->execute([$decoded->sub]);
-            $user = $stmt->fetch();
-
-            if ($user) {
+            if ($user && $user['status'] === 'active') {
                 global $currentUser;
                 $currentUser = $user;
                 return $user;
