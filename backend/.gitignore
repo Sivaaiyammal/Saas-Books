@@ -1,0 +1,55 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Composer dependencies
+vendor/
+composer.lock
+
+# Database files
+database/
+*.sql
+*.sqlite
+*.db
+
+# Utility scripts (contains sensitive data)
+generate-secret.php
+
+# Logs
+logs/*.log
+*.log
+
+# Cache and temporary files
+cache/
+temp/
+tmp/
+*.tmp
+*.cache
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# System files
+.htaccess.bak
+*.old
+
+# Upload directories (if any)
+uploads/
+files/
+
+# Test files
+tests/coverage/
+phpunit.xml
+.phpunit.result.cache
