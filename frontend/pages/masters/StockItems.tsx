@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Plus,
   Search,
@@ -75,15 +75,9 @@ const StockItems: React.FC = () => {
   // View variants state
   const [viewVariants, setViewVariants] = useState<any[]>([]);
 
-  // Ref for GSM inputs to enable auto-focus
-  const gsmInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
   interface VariantData {
     id?: number | null;
     name?: string;
-    gsm: string;
-    dia: string;
-    count: string;
     colour: string;
     opening_stock: number;
     opening_rate: number;
@@ -93,9 +87,6 @@ const StockItems: React.FC = () => {
     {
       id: null,
       name: '',
-      gsm: '',
-      dia: '',
-      count: '',
       colour: '',
       opening_stock: 0,
       opening_rate: 0
@@ -109,9 +100,6 @@ const StockItems: React.FC = () => {
     description: '',
     item_code: '',
     hsn_code: '',
-    gsm: '',
-    count: '',
-    dia: '',
     colour: '',
     item_group_id: '' as string | number,
     unit_id: '' as string | number,
@@ -187,14 +175,14 @@ const StockItems: React.FC = () => {
   const resetForm = () => {
     setFormData({
       name: '', alias: '', description: '', item_code: '', hsn_code: '',
-      gsm: '', count: '', dia: '', colour: '', item_group_id: '', unit_id: '',
+      colour: '', item_group_id: '', unit_id: '',
       opening_stock: '0', opening_rate: '0', minimum_level: '0',
       maximum_level: '0', reorder_level: '0', standard_cost: '0',
       standard_price: '0', tax_id: '', is_service: false,
       track_inventory: true, status: 'active',
     });
     setVariants([
-      { id: null, name: '', gsm: '', dia: '', count: '', colour: '', opening_stock: 0, opening_rate: 0 }
+      { id: null, name: '', colour: '', opening_stock: 0, opening_rate: 0 }
     ]);
     setIsEditing(false);
     setSelectedItem(null);
@@ -231,9 +219,6 @@ const StockItems: React.FC = () => {
       description: item.description || '',
       item_code: item.item_code,
       hsn_code: item.hsn_code || '',
-      gsm: item.gsm || '',
-      count: item.count || '',
-      dia: item.dia || '',
       colour: item.colour || '',
       item_group_id: item.item_group_id,
       unit_id: item.unit_id,
@@ -257,20 +242,17 @@ const StockItems: React.FC = () => {
         const loadedVariants: VariantData[] = response.data.variants.map((v: any) => ({
           id: v.id,
           name: v.name || '',
-          gsm: v.gsm || '',
-          dia: v.dia || '',
-          count: v.count || '',
           colour: v.colour || '',
           opening_stock: parseFloat(v.opening_stock) || 0,
           opening_rate: parseFloat(v.opening_rate) || 0
         }));
         setVariants(loadedVariants);
       } else {
-        setVariants([{ id: null, name: '', gsm: '', dia: '', count: '', colour: '', opening_stock: 0, opening_rate: 0 }]);
+        setVariants([{ id: null, name: '', colour: '', opening_stock: 0, opening_rate: 0 }]);
       }
     } catch (err) {
       console.error('Failed to fetch item variants:', err);
-      setVariants([{ id: null, name: '', gsm: '', dia: '', count: '', colour: '', opening_stock: 0, opening_rate: 0 }]);
+      setVariants([{ id: null, name: '', colour: '', opening_stock: 0, opening_rate: 0 }]);
     }
 
     setIsEditing(true);
@@ -305,22 +287,18 @@ const StockItems: React.FC = () => {
       is_service: formData.is_service ? 1 : 0,
       track_inventory: formData.track_inventory ? 1 : 0,
       status: formData.status,
-      // Textile Specifics - Ensure these are always explicitly included in the root
+      // Textile specifics
       hsn_code: formData.hsn_code.trim() || null,
-      gsm: formData.gsm.trim() || null,
-      count: formData.count.trim() || null,
-      dia: formData.dia.trim() || null,
       colour: formData.colour.trim() || null
 
     };
 
     payload.variants = variants
-      .filter(v => v.gsm || v.colour || v.dia)
+      .filter(v => v.colour)
       .map(v => {
-        // Auto-generate variant name: Product Name - Colour Dia
+        // Auto-generate variant name: Product Name - Colour
         const variantNameParts = [formData.name.trim()];
         if (v.colour) variantNameParts.push(v.colour);
-        if (v.dia) variantNameParts.push(v.dia);
         const autoName = variantNameParts.length > 1
           ? `${variantNameParts[0]} - ${variantNameParts.slice(1).join(' ')}`
           : variantNameParts[0];
@@ -328,9 +306,6 @@ const StockItems: React.FC = () => {
         return {
           id: v.id || null,
           name: v.name || autoName,
-          gsm: v.gsm,
-          dia: v.dia,
-          count: v.count,
           colour: v.colour,
           opening_stock: v.opening_stock,
           opening_rate: v.opening_rate || opRate
@@ -407,7 +382,6 @@ const StockItems: React.FC = () => {
       (item.name && String(item.name).toLowerCase().includes(s)) ||
       (item.item_code && String(item.item_code).toLowerCase().includes(s)) ||
       (item.item_group_name && String(item.item_group_name).toLowerCase().includes(s)) ||
-      (item.gsm != null && String(item.gsm).toLowerCase().includes(s)) ||
       (item.colour != null && String(item.colour).toLowerCase().includes(s));
 
     const matchesGroup = selectedGroupFilter === 'All' || item.item_group_name === selectedGroupFilter;
@@ -455,7 +429,7 @@ const StockItems: React.FC = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input
                 type="text"
-                placeholder="Search specs, colours, names or codes..."
+                placeholder="Search colours, names or codes..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-12 pr-4 py-3 w-full bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 focus:bg-white transition-all"
@@ -548,7 +522,7 @@ const StockItems: React.FC = () => {
               <thead>
                 <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] border-b border-slate-100">
                   <th className="px-8 py-5">Item Detail</th>
-                  <th className="px-8 py-5">Technical Specs</th>
+                  <th className="px-8 py-5">Colour</th>
                   <th className="px-8 py-5">Stock Available</th>
                   <th className="px-8 py-5 text-right">Standard Price</th>
                   <th className="px-8 py-5 text-right">Actions</th>
@@ -577,10 +551,7 @@ const StockItems: React.FC = () => {
                       {Number(item.is_service) ? (
                         <span className="text-[10px] text-slate-300 font-bold uppercase tracking-widest italic">Non-Material Service</span>
                       ) : (
-                        <div className="flex flex-col gap-1">
-                          <div className="text-xs font-bold text-slate-700">{item.gsm || '--'} GSM / {item.dia || '--'} Dia</div>
-                          <div className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Count: {item.count || '--'} | Colour: {item.colour || '--'}</div>
-                        </div>
+                        <div className="text-xs font-black text-slate-700 uppercase tracking-widest">{item.colour || '--'}</div>
                       )}
                     </td>
                     <td className="px-8 py-5">
@@ -674,18 +645,10 @@ const StockItems: React.FC = () => {
 
                   <div className="flex justify-between items-center">
                     <span className="text-xs font-bold text-slate-400">
-                      Technical Specification
+                      Colour
                     </span>
                     <span className="text-xs font-black text-slate-700">
-                      {item.gsm || '--'} GSM / {item.dia || '--'} Dia
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs font-bold text-slate-400">
-                      Count | Colour
-                    </span>
-                    <span className="text-xs font-black text-slate-700">
-                      {item.count || '--'} | {item.colour || '--'}
+                      {item.colour || '--'}
                     </span>
                   </div>
 
@@ -879,9 +842,6 @@ const StockItems: React.FC = () => {
                         <thead className="bg-slate-50 text-[10px] uppercase font-black text-slate-400">
                           <tr>
                             <th className="px-4 py-3">Variant Name</th>
-                            <th className="px-4 py-3 w-[100px]">GSM</th>
-                            <th className="px-4 py-3 w-[100px]">Dia / Width</th>
-                            <th className="px-4 py-3 w-[100px]">Count</th>
                             <th className="px-4 py-3 w-[180px]">Colour</th>
                             <th className="px-4 py-3">Opening Stock</th>
                             <th className="px-4 py-3">Opening Rate</th>
@@ -894,10 +854,9 @@ const StockItems: React.FC = () => {
                             // Generate variant name preview
                             const nameParts = [formData.name.trim()];
                             if (v.colour) nameParts.push(v.colour);
-                            if (v.dia) nameParts.push(v.dia);
                             const previewName = nameParts.length > 1
                               ? `${nameParts[0]} - ${nameParts.slice(1).join(' ')}`
-                              : (v.name || 'Enter colour/dia');
+                              : (v.name || 'Enter colour');
 
                             return (
                               <tr key={index}>
@@ -906,46 +865,6 @@ const StockItems: React.FC = () => {
                                     {v.name || previewName}
                                   </div>
                                 </td>
-                                <td className="px-4 py-2">
-                                  <input
-                                    ref={(el) => { gsmInputRefs.current[index] = el; }}
-                                    value={v.gsm}
-                                    placeholder="180"
-                                    onChange={(e) => {
-                                      const copy = [...variants];
-                                      copy[index].gsm = e.target.value;
-                                      setVariants(copy);
-                                    }}
-                                    className="w-full font-black px-3 py-2 border rounded-xl text-sm"
-                                  />
-                                </td>
-
-                                <td className="px-4 py-2">
-                                  <input
-                                    value={v.dia}
-                                    onChange={(e) => {
-                                      const copy = [...variants];
-                                      copy[index].dia = e.target.value;
-                                      // Clear variant name so auto-generation uses updated dia
-                                      copy[index].name = '';
-                                      setVariants(copy);
-                                    }}
-                                    className="w-full font-black px-3 py-2 border rounded-xl text-sm"
-                                  />
-                                </td>
-
-                                <td className="px-4 py-2">
-                                  <input
-                                    value={v.count}
-                                    onChange={(e) => {
-                                      const copy = [...variants];
-                                      copy[index].count = e.target.value;
-                                      setVariants(copy);
-                                    }}
-                                    className="w-full font-black px-3 py-2 border rounded-xl text-sm"
-                                  />
-                                </td>
-
                                 <td className="px-4 py-2">
                                   <input
                                     value={v.colour}
@@ -1009,15 +928,10 @@ const StockItems: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => {
-                            const newIndex = variants.length;
                             setVariants([
                               ...variants,
-                              { id: null, name: '', gsm: '', dia: '', count: '', colour: '', opening_stock: 0, opening_rate: 0 }
+                              { id: null, name: '', colour: '', opening_stock: 0, opening_rate: 0 }
                             ]);
-                            // Focus on the new GSM input after React renders
-                            setTimeout(() => {
-                              gsmInputRefs.current[newIndex]?.focus();
-                            }, 50);
                           }}
                           className="px-4 py-2 text-xs font-black uppercase bg-indigo-600 text-white rounded-xl flex items-center gap-2 hover:bg-indigo-700 transition-all"
                         >
@@ -1348,11 +1262,8 @@ const StockItems: React.FC = () => {
                               <div className="text-[10px] text-slate-400 font-bold mt-0.5">{variant.item_code || '--'}</div>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-xs font-bold text-slate-700">
-                                {variant.gsm || '--'} GSM / {variant.dia || '--'} Dia
-                              </div>
-                              <div className="text-[10px] text-slate-400 font-bold">
-                                Count: {variant.count || '--'} | Colour: {variant.colour || '--'}
+                              <div className="text-xs font-black text-slate-700 uppercase tracking-widest">
+                                {variant.colour || '--'}
                               </div>
                             </td>
                             <td className="px-6 py-4">

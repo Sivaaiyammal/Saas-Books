@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/auth.php';
+require_once __DIR__ . '/../../../helpers/moduleAccess.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -26,6 +27,9 @@ try {
     if (!$userData) {
         ApiResponse::notFound('User not found');
     }
+
+    $userData['modules'] = ModuleAccessHelper::getCompanyModules($pdo, isset($userData['company_id']) ? (int)$userData['company_id'] : null);
+    $userData['is_saas_admin'] = (($userData['role'] ?? '') === 'super_admin');
 
     ApiResponse::success([
         'user' => $userData

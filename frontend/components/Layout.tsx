@@ -25,7 +25,7 @@ import {
   Building2,
   Wallet
 } from 'lucide-react';
-import { authApi } from '../services/api';
+import { authApi, buildFinancialYearRange, getCurrentFinancialYearLabel, getSelectedFinancialYearLabel, setSelectedFinancialYearLabel } from '../services/api';
 
 interface LayoutProps {
   onLogout: () => void;
@@ -45,12 +45,30 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isFyOpen, setIsFyOpen] = useState(false);
+  const [selectedFinancialYear, setSelectedFinancialYear] = useState(getSelectedFinancialYearLabel());
   const [openMenus, setOpenMenus] = useState<string[]>(['Masters', 'Vouchers']);
   const [user, setUser] = useState<any>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
+  const financialYearLabel = selectedFinancialYear;
+  const companyNameLabel = (user?.company_name || '').trim() || 'Company';
+
   const profileRef = useRef<HTMLDivElement>(null);
   const notifyRef = useRef<HTMLDivElement>(null);
+  const fyRef = useRef<HTMLDivElement>(null);
+
+  const getFinancialYearOptions = () => {
+    const currentLabel = getCurrentFinancialYearLabel();
+    const currentStartYear = parseInt(currentLabel.split('-')[0], 10);
+    const options: string[] = [];
+    for (let year = currentStartYear; year >= currentStartYear - 5; year--) {
+      options.push(buildFinancialYearRange(year).label);
+    }
+    return options;
+  };
+
+  const financialYearOptions = getFinancialYearOptions();
 
   // Responsive Sync
   useEffect(() => {
@@ -90,6 +108,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
     const handleClickOutside = (event: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(event.target as Node)) setIsProfileOpen(false);
       if (notifyRef.current && !notifyRef.current.contains(event.target as Node)) setIsNotificationsOpen(false);
+      if (fyRef.current && !fyRef.current.contains(event.target as Node)) setIsFyOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -99,17 +118,33 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
     setOpenMenus(prev => prev.includes(name) ? prev.filter(m => m !== name) : [...prev, name]);
   };
 
+  const handleFinancialYearSelect = (fyLabel: string) => {
+    setSelectedFinancialYear(fyLabel);
+    setSelectedFinancialYearLabel(fyLabel);
+    setIsFyOpen(false);
+    window.location.reload();
+  };
+
   // Determine visual state of sidebar
   const isExpanded = isMobile ? isSidebarOpenMobile : (isSidebarPinned || isHovered);
 
   // Dynamic offset for content area (Desktop Only)
   const desktopMargin = isSidebarPinned ? 'lg:ml-[280px]' : 'lg:ml-[80px]';
 
+  const isSaasAdmin = user?.role === 'super_admin';
+  const isModuleEnabled = (moduleKey: string): boolean => {
+    const modules = user?.modules;
+    if (!modules || typeof modules !== 'object') return true;
+    if (!(moduleKey in modules)) return true;
+    return Boolean(modules[moduleKey]);
+  };
+
 
   const navItems = [
     {
       section: 'Main', items: [
         { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={18} /> },
+        ...(isSaasAdmin ? [{ name: 'SaaS Admin', path: '/saas-admin', icon: <ShieldCheck size={18} /> }] : []),
       ]
     },
     {
@@ -132,13 +167,13 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
           name: 'Vouchers',
           icon: <FileText size={18} />,
           children: [
-            { name: 'Sales', path: '/reports/sales-register' },
-            { name: 'Delivery Note', path: '/reports/delivery-note-register' },
-            { name: 'Sales Order', path: '/reports/sales-order-register' },
-            { name: 'Purchase', path: '/reports/purchase-register' },
-            { name: 'Quotations', path: '/reports/quotation-register' },
-            { name: 'Payments', path: '/reports/payables' },
-            { name: 'Receipts', path: '/reports/receivables' },
+            ...(isModuleEnabled('sales') ? [{ name: 'Sales', path: '/reports/sales-register' }] : []),
+            ...(isModuleEnabled('delivery_note') ? [{ name: 'Delivery Note', path: '/reports/delivery-note-register' }] : []),
+            ...(isModuleEnabled('sales_order') ? [{ name: 'Sales Order', path: '/reports/sales-order-register' }] : []),
+            ...(isModuleEnabled('purchase') ? [{ name: 'Purchase', path: '/reports/purchase-register' }] : []),
+            ...(isModuleEnabled('quotation') ? [{ name: 'Quotations', path: '/reports/quotation-register' }] : []),
+            ...(isModuleEnabled('payment') ? [{ name: 'Payments', path: '/reports/payables' }] : []),
+            ...(isModuleEnabled('receipt') ? [{ name: 'Receipts', path: '/reports/receivables' }] : []),
             // { name: 'Outstanding', path: '/reports/outstanding' },
           ]
         },
@@ -151,13 +186,13 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
     },
     {
       section: 'Quick Links', items: [
-        { name: 'New Sale', path: '/vouchers/sales', icon: <Plus size={18} className="text-emerald-500" /> },
-        { name: 'New Delivery Note', path: '/vouchers/delivery-note-voucher', icon: <Plus size={18} className="text-purple-500" /> },
-        { name: 'New Sales Order', path: '/vouchers/sales-order', icon: <Plus size={18} className="text-orange-500" /> },
-        { name: 'New Purchase', path: '/vouchers/purchase', icon: <Plus size={18} className="text-rose-500" /> },
-        { name: 'New Quotation', path: '/vouchers/quotation', icon: <Plus size={18} className="text-blue-500" /> },
-        { name: 'New Receipt', path: '/vouchers/receipt', icon: <Receipt size={18} className="text-indigo-500" /> },
-        { name: 'New Payment', path: '/vouchers/payment', icon: <CreditCard size={18} className="text-amber-500" /> },
+        ...(isModuleEnabled('sales') ? [{ name: 'New Sale', path: '/vouchers/sales', icon: <Plus size={18} className="text-emerald-500" /> }] : []),
+        ...(isModuleEnabled('delivery_note') ? [{ name: 'New Delivery Note', path: '/vouchers/delivery-note-voucher', icon: <Plus size={18} className="text-purple-500" /> }] : []),
+        ...(isModuleEnabled('sales_order') ? [{ name: 'New Sales Order', path: '/vouchers/sales-order', icon: <Plus size={18} className="text-orange-500" /> }] : []),
+        ...(isModuleEnabled('purchase') ? [{ name: 'New Purchase', path: '/vouchers/purchase', icon: <Plus size={18} className="text-rose-500" /> }] : []),
+        ...(isModuleEnabled('quotation') ? [{ name: 'New Quotation', path: '/vouchers/quotation', icon: <Plus size={18} className="text-blue-500" /> }] : []),
+        ...(isModuleEnabled('receipt') ? [{ name: 'New Receipt', path: '/vouchers/receipt', icon: <Receipt size={18} className="text-indigo-500" /> }] : []),
+        ...(isModuleEnabled('payment') ? [{ name: 'New Payment', path: '/vouchers/payment', icon: <CreditCard size={18} className="text-amber-500" /> }] : []),
         { name: 'Settings', path: '/settings', icon: <Settings size={18} className="text-slate-500" /> },
       ]
     }
@@ -314,6 +349,36 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
+            <div className="hidden sm:flex items-center px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50">
+              <Building2 size={14} className="text-slate-500" />
+              <span className="ml-2 text-xs font-black text-slate-700 max-w-[180px] truncate" title={companyNameLabel}>{companyNameLabel}</span>
+            </div>
+
+            <div className="relative hidden sm:block" ref={fyRef}>
+              <button
+                onClick={() => setIsFyOpen(!isFyOpen)}
+                className="flex items-center px-3 py-1.5 rounded-xl border border-indigo-100 bg-indigo-50/60 hover:bg-indigo-100/70 transition-all"
+              >
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">FY</span>
+                <span className="ml-2 text-xs font-black text-indigo-700">{financialYearLabel}</span>
+                <ChevronDown size={14} className={`ml-2 text-indigo-500 transition-transform ${isFyOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isFyOpen && (
+                <div className="absolute right-0 mt-2 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-[160] overflow-hidden">
+                  {financialYearOptions.map((fy) => (
+                    <button
+                      key={fy}
+                      onClick={() => handleFinancialYearSelect(fy)}
+                      className={`w-full text-left px-3 py-2.5 text-xs font-bold transition-colors ${fy === selectedFinancialYear ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                      FY {fy}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Notifications */}
             <div className="relative" ref={notifyRef}>
               <button

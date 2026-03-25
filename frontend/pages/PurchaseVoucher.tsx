@@ -30,9 +30,6 @@ interface StockItem {
   tax_percent?: number;
   rate?: number;
   colour?: string;
-  gsm?: string;
-  dia?: string;
-  count?: string;
   opening_stock?: number;
 }
 
@@ -155,7 +152,8 @@ const PurchaseVoucher: React.FC = () => {
 
   const [prefix, setPrefix] = useState('INV');
   const [suffix, setSuffix] = useState('24-25');
-  const [sequence, setSequence] = useState('0012');
+  const [sequence, setSequence] = useState('');
+  const [customInvoiceNo, setCustomInvoiceNo] = useState<string | null>(null);
   const [isEditingInvoice, setIsEditingInvoice] = useState(false);
   const [showInvoiceSettings, setShowInvoiceSettings] = useState(false);
   const [placeOfSupply, setPlaceOfSupply] = useState('33');
@@ -175,6 +173,25 @@ const PurchaseVoucher: React.FC = () => {
   const selectedParty = parties.find(p => p.id === selectedPartyId) || null;
   const selectedConsignee = parties.find(p => p.id === selectedConsigneeId) || null;
   const selectedGodown = godowns.find(g => g.id === selectedGodownId) || null;
+
+  const parseAndSetVoucherNo = (voucherNo: string) => {
+    if (!voucherNo) return;
+    setCustomInvoiceNo(voucherNo);
+
+    let parts = voucherNo.split('/');
+    if (parts.length >= 3) {
+      setPrefix(parts[0]);
+      setSequence(parts[1]);
+      setSuffix(parts[2]);
+      return;
+    }
+
+    parts = voucherNo.split('-');
+    if (parts.length >= 2) {
+      setPrefix(parts[0]);
+      setSequence(parts[1]);
+    }
+  };
 
   // Fetch data from API
   useEffect(() => {
@@ -216,6 +233,13 @@ const PurchaseVoucher: React.FC = () => {
         if (settingsRes.success && settingsRes.data) {
           setBusinessDetails(settingsRes.data);
         }
+
+        if (!editVoucher) {
+          const nextVoucherRes = await vouchersApi.getNextPurchaseVoucherNo();
+          if (nextVoucherRes.success && nextVoucherRes.data?.next_voucher_no) {
+            parseAndSetVoucherNo(nextVoucherRes.data.next_voucher_no);
+          }
+        }
       } catch (err: any) {
         setError(err.message || 'Failed to load data');
       } finally {
@@ -232,13 +256,8 @@ const PurchaseVoucher: React.FC = () => {
       setIsEditing(true);
       setEditingVoucherId(editVoucher.id);
 
-      // Parse voucher number (e.g., "INV/0012/24-25")
-      const voucherParts = editVoucher.voucher_no?.split('/') || [];
-      if (voucherParts.length >= 3) {
-        setPrefix(voucherParts[0]);
-        setSequence(voucherParts[1]);
-        setSuffix(voucherParts[2]);
-      }
+      // Parse voucher number from existing voucher
+      parseAndSetVoucherNo(editVoucher.voucher_no || '');
 
       // Set party - check both party_id and party_ledger_id
       const partyId = editVoucher.party_id || editVoucher.party_ledger_id;
@@ -307,9 +326,6 @@ const PurchaseVoucher: React.FC = () => {
             itemId: itemIdStr,
             item: item.item_name || '',
             colour: item.colour || '',
-            gsm: item.gsm || '',
-            dia: item.dia || '',
-            count: item.count || '',
             qty: parseFloat(item.quantity) || 0,
             rate: parseFloat(item.rate) || 0,
             unit: item.unit_name || 'Pcs',
@@ -345,16 +361,13 @@ const PurchaseVoucher: React.FC = () => {
         itemId,
         item: selected.name,
         colour: selected.colour || '',
-        gsm: selected.gsm || '',
-        dia: selected.dia || '',
-        count: selected.count || '',
         rate: selected.rate || 0,
         unit: defaultUnit?.name || 'Pcs',
         gst: defaultTax?.rate || 0,
         amount: newRows[idx].qty * (selected.rate || 0)
       };
     } else {
-      newRows[idx] = { ...newRows[idx], itemId: '', item: '', colour: '', gsm: '', dia: '', count: '', rate: 0, amount: 0 };
+      newRows[idx] = { ...newRows[idx], itemId: '', item: '', colour: '', rate: 0, amount: 0 };
     }
     setRows(newRows);
   };
@@ -408,10 +421,6 @@ const PurchaseVoucher: React.FC = () => {
             item_id: parseInt(row.itemId),
             item_name: row.item,
             colour: row.colour || undefined,
-            gsm: row.gsm || undefined,
-            dia: row.dia || undefined,
-            count: row.count || undefined,
-            roll: row.roll || undefined,
             quantity: row.qty,
             unit_id: unit?.id || stockItem?.unit_id || 1,
             rate: row.rate,
@@ -431,6 +440,7 @@ const PurchaseVoucher: React.FC = () => {
 
       const payload: any = {
         party_ledger_id: selectedPartyId,
+        voucher_no: currentInvoiceNo,
         voucher_date: voucherDate,
         reference_no: referenceNo || undefined,
         company_state: godownState,
@@ -504,7 +514,8 @@ const PurchaseVoucher: React.FC = () => {
   const roundedTotal = Math.round(subTotal);
   const roundOff = roundedTotal - subTotal;
   const finalTotal = roundedTotal;
-  const currentInvoiceNo = `${prefix}/${sequence}/${suffix}`;
+  const generatedInvoiceNo = suffix ? `${prefix}/${sequence}/${suffix}` : `${prefix}-${sequence}`;
+  const currentInvoiceNo = customInvoiceNo ?? generatedInvoiceNo;
 
   const stockItemOptions = stockItems.map(item => ({
     value: item.id,
@@ -579,6 +590,7 @@ const PurchaseVoucher: React.FC = () => {
                 <input
                   type="text"
                   value={currentInvoiceNo}
+                  onChange={(e) => setCustomInvoiceNo(e.target.value)}
                   readOnly={!isEditingInvoice}
                   className={`text-xs font-black text-indigo-600 bg-transparent border-none p-0 focus:ring-0 w-32 ${isEditingInvoice ? 'border-b border-indigo-600' : ''}`}
                 />
@@ -593,11 +605,11 @@ const PurchaseVoucher: React.FC = () => {
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Voucher Settings</p>
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold text-slate-600">Prefix</label>
-                      <input type="text" value={prefix} onChange={(e) => setPrefix(e.target.value)} className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+                      <input type="text" value={prefix} onChange={(e) => { setPrefix(e.target.value); setCustomInvoiceNo(null); }} className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold text-slate-600">Suffix</label>
-                      <input type="text" value={suffix} onChange={(e) => setSuffix(e.target.value)} className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+                      <input type="text" value={suffix} onChange={(e) => { setSuffix(e.target.value); setCustomInvoiceNo(null); }} className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" />
                     </div>
                     <button onClick={() => setShowInvoiceSettings(false)} className="w-full py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-xl tracking-widest">Apply</button>
                   </div>
@@ -647,9 +659,7 @@ const PurchaseVoucher: React.FC = () => {
                 <input
                   type="text"
                   value={currentInvoiceNo}
-                  // onChange={(e) => {
-                  //   setCustomInvoiceNo(e.target.value);
-                  // }}
+                  onChange={(e) => setCustomInvoiceNo(e.target.value)}
                   readOnly={!isEditingInvoice}
                   className="text-[11px] font-black text-indigo-600 bg-transparent border-b border-transparent hover:border-indigo-300 focus:border-indigo-600 p-0 focus:ring-0 w-28 cursor-text outline-none transition-colors"
                 />
@@ -664,7 +674,7 @@ const PurchaseVoucher: React.FC = () => {
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Voucher Settings</p>
                     <div className="space-y-2">
                       <label className="text-[10px] font-bold text-slate-600">Prefix</label>
-                      <input type="text" value={prefix} onChange={(e) => setPrefix(e.target.value)} className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" />
+                      <input type="text" value={prefix} onChange={(e) => { setPrefix(e.target.value); setCustomInvoiceNo(null); }} className="w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" />
                     </div>
                     <button onClick={() => setShowInvoiceSettings(false)} className="w-full py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-xl tracking-widest">Apply</button>
                   </div>
@@ -711,9 +721,7 @@ const PurchaseVoucher: React.FC = () => {
                 <input
                   type="text"
                   value={currentInvoiceNo}
-                  // onChange={(e) => {
-                  //   setCustomInvoiceNo(e.target.value);
-                  // }}
+                  onChange={(e) => setCustomInvoiceNo(e.target.value)}
                   readOnly={!isEditingInvoice}
                   className="text-[10px] font-black text-indigo-600 bg-transparent border-b border-transparent hover:border-indigo-300 focus:border-indigo-600 p-0 focus:ring-0 w-24 cursor-text outline-none transition-colors"
                 />
@@ -735,7 +743,7 @@ const PurchaseVoucher: React.FC = () => {
           <div className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2 animate-in slide-in-from-top-2">
             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Voucher Settings</p>
             <div className="flex gap-2">
-              <input type="text" value={prefix} onChange={(e) => setPrefix(e.target.value)} className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" placeholder="Prefix" />
+              <input type="text" value={prefix} onChange={(e) => { setPrefix(e.target.value); setCustomInvoiceNo(null); }} className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 outline-none" placeholder="Prefix" />
               <button onClick={() => setShowInvoiceSettings(false)} className="px-4 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-lg tracking-widest">Apply</button>
             </div>
           </div>
@@ -1179,10 +1187,6 @@ const PurchaseVoucher: React.FC = () => {
                   <th className="px-1 py-4 w-[35px] text-center">#</th>
                   <th className="px-1 py-4 w-[180px]">Stock Item</th>
                   <th className="px-1 py-4 w-[90px]">Colour</th>
-                  <th className="px-1 py-4 w-[40px]">GSM</th>
-                  <th className="px-1 py-4 w-[40px]">Dia</th>
-                  <th className="px-1 py-4 w-[40px]">Count</th>
-                  <th className="px-1 py-4 w-[40px]">Roll</th>
                   <th className="px-1 py-4 w-[60px]">Qty</th>
                   <th className="px-1 py-4 w-[40px]">Unit</th>
                   <th className="px-1 py-4 w-[80px]">Rate</th>
@@ -1218,42 +1222,6 @@ const PurchaseVoucher: React.FC = () => {
                         placeholder="e.g. Navy"
                         onChange={(e) => updateRowValue(idx, 'colour', e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-300"
-                      />
-                    </td>
-                    <td className="px-0.5 py-4">
-                      <input
-                        type="text"
-                        value={row.gsm}
-                        placeholder="--"
-                        onChange={(e) => updateRowValue(idx, 'gsm', e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-[11px] font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-300"
-                      />
-                    </td>
-                    <td className="px-0.5 py-4">
-                      <input
-                        type="text"
-                        value={row.dia}
-                        placeholder="--"
-                        onChange={(e) => updateRowValue(idx, 'dia', e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-[11px] font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-300"
-                      />
-                    </td>
-                    <td className="px-0.5 py-4">
-                      <input
-                        type="text"
-                        value={row.count}
-                        placeholder="--"
-                        onChange={(e) => updateRowValue(idx, 'count', e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-[11px] font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-300"
-                      />
-                    </td>
-                    <td className="px-0.5 py-4">
-                      <input
-                        type="number"
-                        value={row.roll}
-                        placeholder="0"
-                        onChange={(e) => updateRowValue(idx, 'roll', parseInt(e.target.value) || 0)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-[11px] font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-300"
                       />
                     </td>
                     <td className="px-0.5 py-4">
@@ -1330,8 +1298,6 @@ const PurchaseVoucher: React.FC = () => {
                   <th className="px-1 py-4 w-[35px] text-center">#</th>
                   <th className="px-1 py-4 w-[160px]">Stock Item</th>
                   <th className="px-1 py-4 w-[80px]">Colour</th>
-                  <th className="px-1 py-4 w-[40px]">GSM</th>
-                  <th className="px-1 py-4 w-[40px]">Dia</th>
                   <th className="px-1 py-4 w-[50px]">Qty</th>
                   <th className="px-1 py-4 w-[40px]">Unit</th>
                   <th className="px-1 py-4 w-[70px]">Rate</th>
@@ -1366,24 +1332,6 @@ const PurchaseVoucher: React.FC = () => {
                         placeholder="e.g. Navy"
                         onChange={(e) => updateRowValue(idx, 'colour', e.target.value)}
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-300"
-                      />
-                    </td>
-                    <td className="px-0.5 py-4">
-                      <input
-                        type="text"
-                        value={row.gsm}
-                        placeholder="--"
-                        onChange={(e) => updateRowValue(idx, 'gsm', e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-[11px] font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-300"
-                      />
-                    </td>
-                    <td className="px-0.5 py-4">
-                      <input
-                        type="text"
-                        value={row.dia}
-                        placeholder="--"
-                        onChange={(e) => updateRowValue(idx, 'dia', e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-[11px] font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-300"
                       />
                     </td>
                     <td className="px-0.5 py-4">
@@ -1483,24 +1431,6 @@ const PurchaseVoucher: React.FC = () => {
                       onChange={(e) => updateRowValue(idx, 'colour', e.target.value)}
                       className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none"
                     />
-                  </div>
-                  <div className="grid grid-cols-4 col-span-1 gap-1">
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">GSM</label>
-                      <input type="text" value={row.gsm} placeholder="--" onChange={(e) => updateRowValue(idx, 'gsm', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-2 text-[10px] font-bold font-mono text-center text-slate-900 outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Dia</label>
-                      <input type="text" value={row.dia} placeholder="--" onChange={(e) => updateRowValue(idx, 'dia', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-2 text-[10px] font-bold font-mono text-center text-slate-900 outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Cnt</label>
-                      <input type="text" value={row.count} placeholder="--" onChange={(e) => updateRowValue(idx, 'count', e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-2 text-[10px] font-bold font-mono text-center text-slate-900 outline-none" />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">Roll</label>
-                      <input type="number" value={row.roll} placeholder="0" onChange={(e) => updateRowValue(idx, 'roll', parseInt(e.target.value) || 0)} className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-2 text-[10px] font-bold font-mono text-center text-slate-900 outline-none" />
-                    </div>
                   </div>
                 </div>
 

@@ -26,16 +26,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/moduleAccess.php';
 require_once __DIR__ . '/../../../helpers/voucher.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 // Allow next_voucher_no endpoint without authentication
 if (!isset($_GET['next_voucher_no'])) {
     $user = AuthMiddleware::authenticate();
+    ModuleAccessHelper::requireModule($pdo, $user, 'quotation', 'Quotation');
 }
 
 try {
     $pdo = getDBConnection();
+    $companyId = isset($user) ? TenantHelper::getCompanyId($user) : null;
     $method = $_SERVER['REQUEST_METHOD'];
 
     // GET: List quotations or get single
@@ -117,6 +121,7 @@ try {
 
         $where = ["v.voucher_type = 'Quotation'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'v.company_id');
 
         if ($search) {
             $where[] = "(v.voucher_no LIKE ? OR v.reference_no LIKE ? OR l.name LIKE ?)";
@@ -234,7 +239,7 @@ try {
             // Generate quotation number
             $voucherNo = isset($input['voucher_no']) && $input['voucher_no']
                 ? $input['voucher_no']
-                : VoucherHelper::generateVoucherNo($pdo, 'Quotation', $input['company_id'] ?? null, 1);
+                : VoucherHelper::generateVoucherNo($pdo, 'Quotation', $companyId, 1);
 
             // Calculate totals (Simple calculation without GST)
             $subtotal = 0;
@@ -312,7 +317,7 @@ try {
             ");
 
             $stmt->execute([
-                $input['company_id'] ?? null,
+                $companyId,
                 $voucherNo,
                 $input['voucher_date'],
                 $input['reference_no'] ?? null,

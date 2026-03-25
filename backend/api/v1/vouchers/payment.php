@@ -29,13 +29,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/moduleAccess.php';
 require_once __DIR__ . '/../../../helpers/voucher.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 $user = AuthMiddleware::authenticate();
+ModuleAccessHelper::requireModule($pdo, $user, 'payment', 'Payment');
 
 try {
     $pdo = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
     // GET: List payments or get single or get outstanding bills
@@ -138,6 +142,7 @@ try {
 
         $where = ["v.voucher_type = 'Payment'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'v.company_id');
 
         // Hide cancelled by default unless show_cancelled=1 or status=cancelled
         if ($status) {

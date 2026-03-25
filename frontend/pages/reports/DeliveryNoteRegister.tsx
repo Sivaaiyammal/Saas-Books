@@ -140,10 +140,10 @@ const DeliveryNoteRegister: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await vouchersApi.getSalesVouchers();
-      if (response.success && response.data?.invoices) {
+      const response = await vouchersApi.getDeliveryNotes();
+      if (response.success && response.data?.delivery_notes) {
         // Transform API response to match interface structure
-        const transformedInvoices = response.data.invoices.map((inv: any) => ({
+        const transformedInvoices = response.data.delivery_notes.map((inv: any) => ({
           ...inv,
           einvoice: {
             status: inv.einvoice_status as
@@ -166,7 +166,7 @@ const DeliveryNoteRegister: React.FC = () => {
         }));
         setInvoices(transformedInvoices);
       } else {
-        setError("Failed to load sales register data");
+        setError("Failed to load delivery note register data");
       }
     } catch (err) {
       setError("Failed to connect to server");
@@ -297,7 +297,7 @@ const DeliveryNoteRegister: React.FC = () => {
     setIsLoadingDetails(true);
 
     try {
-      const res = await vouchersApi.getSalesVoucher(bill.id);
+      const res = await vouchersApi.getDeliveryNote(bill.id);
       if (res.success && res.data) {
         // Transform API response to match interface structure
         const transformedVoucher = {
@@ -334,7 +334,7 @@ const DeliveryNoteRegister: React.FC = () => {
   const handleEdit = async (bill: SalesInvoice) => {
     setOpenMenuId(null);
     try {
-      const res = await vouchersApi.getSalesVoucher(bill.id);
+      const res = await vouchersApi.getDeliveryNote(bill.id);
       if (res.success && res.data) {
         // Transform API response to match interface structure
         const transformedVoucher = {
@@ -359,7 +359,7 @@ const DeliveryNoteRegister: React.FC = () => {
             ewb_date: res.data.ewb_date || null,
           },
         };
-        navigate("/vouchers/sales", {
+        navigate("/vouchers/delivery-note-voucher", {
           state: {
             editVoucher: transformedVoucher,
           },
@@ -380,7 +380,7 @@ const DeliveryNoteRegister: React.FC = () => {
     if (!selectedVoucher) return;
     setIsDeleting(true);
     try {
-      const response = await vouchersApi.deleteSalesVoucher(selectedVoucher.id);
+      const response = await vouchersApi.deleteDeliveryNote(selectedVoucher.id);
       if (response.success) {
         setInvoices((prev) =>
           prev.filter((inv) => inv.id !== selectedVoucher.id),
@@ -523,7 +523,7 @@ const DeliveryNoteRegister: React.FC = () => {
       );
       const detailedInvoices = await Promise.all(
         selectedInvoices.map(async (inv) => {
-          const res = await vouchersApi.getSalesVoucher(inv.id);
+          const res = await vouchersApi.getDeliveryNote(inv.id);
           if (res.success && res.data) {
             return {
               ...inv,
@@ -660,7 +660,7 @@ const DeliveryNoteRegister: React.FC = () => {
       );
       const detailedInvoices = await Promise.all(
         selectedInvoices.map(async (inv) => {
-          const res = await vouchersApi.getSalesVoucher(inv.id);
+          const res = await vouchersApi.getDeliveryNote(inv.id);
           if (res.success && res.data) {
             return {
               ...inv,

@@ -26,13 +26,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/moduleAccess.php';
 require_once __DIR__ . '/../../../helpers/voucher.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 $user = AuthMiddleware::authenticate();
+ModuleAccessHelper::requireModule($pdo, $user, 'delivery_note', 'Delivery Note');
 
 try {
     $pdo = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
     // ─────────────────────────────────────────────────────────
@@ -97,6 +101,7 @@ try {
 
         $where  = ["v.voucher_type = 'Delivery Note'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'v.company_id');
 
         if ($search) {
             $where[]  = "(v.voucher_no LIKE ? OR l.name LIKE ?)";
@@ -250,7 +255,7 @@ try {
                 ) VALUES (?, 'Delivery Note', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
             $stmt->execute([
-                $input['company_id']      ?? null,
+                $companyId,
                 $voucherNo,
                 $input['voucher_date'],
                 $input['reference_no']    ?? null,

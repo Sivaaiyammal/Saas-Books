@@ -14,6 +14,74 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+const FINANCIAL_YEAR_STORAGE_KEY = 'selected_financial_year';
+
+export interface FinancialYearRange {
+  label: string;
+  startDate: string;
+  endDate: string;
+}
+
+export const buildFinancialYearRange = (startYear: number): FinancialYearRange => {
+  const endYearShort = String((startYear + 1) % 100).padStart(2, '0');
+  return {
+    label: `${startYear}-${endYearShort}`,
+    startDate: `${startYear}-04-01`,
+    endDate: `${startYear + 1}-03-31`,
+  };
+};
+
+export const getCurrentFinancialYearLabel = (): string => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const startYear = now.getMonth() >= 3 ? year : year - 1;
+  return buildFinancialYearRange(startYear).label;
+};
+
+export const getSelectedFinancialYearLabel = (): string => {
+  const saved = localStorage.getItem(FINANCIAL_YEAR_STORAGE_KEY);
+  return saved || getCurrentFinancialYearLabel();
+};
+
+export const setSelectedFinancialYearLabel = (label: string) => {
+  localStorage.setItem(FINANCIAL_YEAR_STORAGE_KEY, label);
+};
+
+export const getFinancialYearRangeByLabel = (label: string): FinancialYearRange | null => {
+  const match = /^(\d{4})-(\d{2})$/.exec(label);
+  if (!match) return null;
+  const startYear = parseInt(match[1], 10);
+  return buildFinancialYearRange(startYear);
+};
+
+const shouldApplyFinancialYearFilter = (endpoint: string, method: string): boolean => {
+  if (method !== 'GET') return false;
+  if (endpoint.includes('/auth/')) return false;
+  if (endpoint.includes('/admin/')) return false;
+  return true;
+};
+
+const withFinancialYearParams = (endpoint: string, method: string): string => {
+  if (!shouldApplyFinancialYearFilter(endpoint, method)) return endpoint;
+
+  const selectedFy = getSelectedFinancialYearLabel();
+  const range = getFinancialYearRangeByLabel(selectedFy);
+  if (!range) return endpoint;
+
+  const [path, queryString = ''] = endpoint.split('?');
+  const params = new URLSearchParams(queryString);
+
+  if (!params.has('from_date')) {
+    params.set('from_date', range.startDate);
+  }
+  if (!params.has('to_date')) {
+    params.set('to_date', range.endDate);
+  }
+
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
+};
+
 // Token management
 export const setAuthToken = (token: string) => {
   localStorage.setItem('auth_token', token);
@@ -100,6 +168,8 @@ const refreshAccessToken = async (): Promise<string | null> => {
  */
 export const apiClient = async (endpoint: string, options: RequestInit = {}, _isRetry = false): Promise<any> => {
   const token = getAuthToken();
+  const method = (options.method || 'GET').toUpperCase();
+  const endpointWithFy = withFinancialYearParams(endpoint, method);
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -107,7 +177,7 @@ export const apiClient = async (endpoint: string, options: RequestInit = {}, _is
   };
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await fetch(`${API_BASE_URL}${endpointWithFy}`, {
       ...options,
       headers,
     });
@@ -141,7 +211,7 @@ export const apiClient = async (endpoint: string, options: RequestInit = {}, _is
               ...headers,
               'Authorization': `Bearer ${newToken}`,
             };
-            fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers: newHeaders })
+            fetch(`${API_BASE_URL}${endpointWithFy}`, { ...options, headers: newHeaders })
               .then(res => res.json())
               .then(resolve)
               .catch(reject);
@@ -198,10 +268,14 @@ interface UserProfile {
   name: string;
   email: string;
   phone: string | null;
+  company_id?: number | null;
+  company_name?: string | null;
   role: string;
   status: string;
   created_at: string;
   last_login: string;
+  modules?: CompanyModules;
+  is_saas_admin?: boolean;
 }
 
 interface AuthResponse {
@@ -216,6 +290,64 @@ interface AuthResponse {
       expiresIn: number;
     };
   };
+}
+
+export interface CompanyModules {
+  sales_order: boolean;
+  purchase_order: boolean;
+  sales: boolean;
+  purchase: boolean;
+  payment: boolean;
+  receipt: boolean;
+  delivery_note: boolean;
+  quotation: boolean;
+}
+
+export interface SaasPlan {
+  id: number;
+  code: string;
+  name: string;
+  amount: number;
+  currency: string;
+  validity_days: number;
+  status: string;
+  features?: any;
+}
+
+export interface SaasCompany {
+  id: number;
+  code: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  owner_name: string | null;
+  owner_email: string | null;
+  owner_phone: string | null;
+  user_count: number;
+  status: string;
+  created_at: string;
+  subscription_id: number | null;
+  plan_id: number | null;
+  subscription_status: string | null;
+  payment_status: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  amount_paid: number | null;
+  plan_name: string | null;
+  plan_code: string | null;
+  modules: CompanyModules;
+}
+
+export interface CreateCompanyRequest {
+  company_name: string;
+  company_email?: string;
+  company_phone?: string;
+  admin_name: string;
+  admin_email: string;
+  admin_phone?: string;
+  admin_password: string;
+  plan_id?: number;
+  modules?: Partial<CompanyModules>;
 }
 
 interface ReceiptRequest {
@@ -273,6 +405,35 @@ export const authApi = {
 
   async getMe(): Promise<AuthResponse> {
     return apiClient('/auth/me.php');
+  }
+};
+
+export const adminApi = {
+  async getCompaniesOverview(): Promise<{ success: boolean; data: { companies: SaasCompany[]; plans: SaasPlan[] } }> {
+    return apiClient('/admin/companies.php');
+  },
+  async createCompany(payload: CreateCompanyRequest): Promise<{ success: boolean; message: string; data?: { company: SaasCompany; admin_user: { id: number; name: string; email: string } } }> {
+    return apiClient('/admin/companies.php', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+  async updateCompanyAccess(payload: {
+    company_id: number;
+    plan_id?: number;
+    company_status?: 'active' | 'inactive';
+    modules?: Partial<CompanyModules>;
+  }): Promise<{ success: boolean; message: string; data?: { company: SaasCompany } }> {
+    return apiClient('/admin/companies.php', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+  },
+  async impersonateCompany(company_id: number): Promise<AuthResponse> {
+    return apiClient('/admin/impersonate.php', {
+      method: 'POST',
+      body: JSON.stringify({ company_id }),
+    });
   }
 };
 
@@ -460,10 +621,6 @@ interface SalesVoucherItem {
   item_id: number;
   item_name: string;
   colour?: string;
-  gsm?: string;
-  dia?: string;
-  count?: string;
-  roll?: number;
   quantity: number;
   unit_id: number;
   rate: number;
@@ -532,8 +689,23 @@ export const vouchersApi = {
       body: JSON.stringify({ id }),
     });
   },
+  async getDeliveryNotes(): Promise<{ success: boolean; data: { delivery_notes: any[]; pagination?: any } }> {
+    return apiClient('/vouchers/delivery_note.php');
+  },
+  async getDeliveryNote(id: number): Promise<{ success: boolean; data: any }> {
+    return apiClient(`/vouchers/delivery_note.php?id=${id}`);
+  },
+  async deleteDeliveryNote(id: number): Promise<{ success: boolean; message: string }> {
+    return apiClient('/vouchers/delivery_note.php', {
+      method: 'DELETE',
+      body: JSON.stringify({ id }),
+    });
+  },
   async getNextSalesVoucherNo(): Promise<{ success: boolean; message: string; data?: { next_voucher_no: string } }> {
     return apiClient('/vouchers/sales.php?next_voucher_no=true');
+  },
+  async getNextPurchaseVoucherNo(): Promise<{ success: boolean; message: string; data?: { next_voucher_no: string } }> {
+    return apiClient('/vouchers/purchase.php?next_voucher_no=true');
   },
 
   async createPurchaseVoucher(data: SalesVoucherRequest): Promise<{ success: boolean; message: string; data?: any }> {

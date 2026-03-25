@@ -28,22 +28,59 @@ import QuotationVoucher from './pages/QuotationVoucher';
 import QuotationRegister from './pages/reports/QuotationRegister';
 import Settings from './pages/Settings';
 import Layout from './components/Layout';
-import { getAuthToken, clearTokens } from './services/api';
 import SalesOrderVoucher from "./pages/SalesOrderVoucher";
 import SalesOrderRegister from "./pages/reports/SalesOrderRegister";
 import DeliveryNoteVoucher from "./pages/DeliveryNoteVoucher";
 import DeliveryNoteRegister from "./pages/reports/DeliveryNoteRegister";
 import Profile from "./pages/Profile";
+import SaasAdminPanel from './pages/SaasAdminPanel';
+import { authApi, getAuthToken, clearTokens } from './services/api';
+
+type ModuleKey = 'sales_order' | 'purchase_order' | 'sales' | 'purchase' | 'payment' | 'receipt' | 'delivery_note' | 'quotation';
+
+interface RouteGuardProps {
+  element: React.ReactElement;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  currentUser: any;
+  moduleKey?: ModuleKey;
+  requireSaasAdmin?: boolean;
+}
+
+const RouteGuard: React.FC<RouteGuardProps> = ({ element, isAuthenticated, isLoading, currentUser, moduleKey, requireSaasAdmin }) => {
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (isLoading) {
+    return <div className="min-h-[50vh] flex items-center justify-center text-slate-600 font-bold">Loading access...</div>;
+  }
+
+  if (requireSaasAdmin && currentUser?.role !== 'super_admin') {
+    return <Navigate to="/" replace />;
+  }
+
+  if (moduleKey && currentUser?.role !== 'super_admin') {
+    const allowed = currentUser?.modules?.[moduleKey];
+    if (allowed === false) {
+      return <Navigate to="/" replace />;
+    }
+  }
+
+  return element;
+};
 
 const App: React.FC = () => {
-  // Check for existing token on initialization
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(!!getAuthToken());
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isUserLoading, setIsUserLoading] = useState<boolean>(!!getAuthToken());
 
   const handleLogin = () => setIsAuthenticated(true);
 
   const handleLogout = () => {
     clearTokens();
     setIsAuthenticated(false);
+    setCurrentUser(null);
   };
 
   // Sync state if token is removed externally (e.g., from api interceptor)
@@ -60,6 +97,41 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!isAuthenticated) {
+      setCurrentUser(null);
+      setIsUserLoading(false);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    setIsUserLoading(true);
+
+    authApi.getMe()
+      .then((response) => {
+        if (!isMounted) return;
+        setCurrentUser(response.data?.user || null);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        clearTokens();
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsUserLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated]);
+
   return (
     <BrowserRouter>
       <Routes>
@@ -70,6 +142,7 @@ const App: React.FC = () => {
         <Route element={isAuthenticated ? <Layout onLogout={handleLogout} /> : <Navigate to="/login" />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/saas-admin" element={<RouteGuard element={<SaasAdminPanel />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} requireSaasAdmin />} />
           <Route path="/profile-settings" element={<Profile />} />
           {/* Masters */}
           <Route path="/masters/ledgers" element={<Ledgers />} />
@@ -81,21 +154,21 @@ const App: React.FC = () => {
           <Route path="/masters/ledger-groups" element={<LedgerGroups />} />
           <Route path="/masters/stock-convert" element={<StockConvert />} />
           {/* Vouchers */}
-          <Route path="/vouchers/sales" element={<SalesVoucher />} />
-          <Route path="/vouchers/delivery-note-voucher" element={<DeliveryNoteVoucher />} />
-          <Route path="/vouchers/sales-order" element={<SalesOrderVoucher />} />
-          <Route path="/vouchers/purchase" element={<PurchaseVoucher />} />
-          <Route path="/vouchers/payment" element={<PaymentVoucher />} />
-          <Route path="/vouchers/receipt" element={<ReceiptVoucher />} />
-          <Route path="/vouchers/quotation" element={<QuotationVoucher />} />
+          <Route path="/vouchers/sales" element={<RouteGuard element={<SalesVoucher />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="sales" />} />
+          <Route path="/vouchers/delivery-note-voucher" element={<RouteGuard element={<DeliveryNoteVoucher />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="delivery_note" />} />
+          <Route path="/vouchers/sales-order" element={<RouteGuard element={<SalesOrderVoucher />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="sales_order" />} />
+          <Route path="/vouchers/purchase" element={<RouteGuard element={<PurchaseVoucher />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="purchase" />} />
+          <Route path="/vouchers/payment" element={<RouteGuard element={<PaymentVoucher />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="payment" />} />
+          <Route path="/vouchers/receipt" element={<RouteGuard element={<ReceiptVoucher />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="receipt" />} />
+          <Route path="/vouchers/quotation" element={<RouteGuard element={<QuotationVoucher />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="quotation" />} />
           <Route path="/reports" element={<Reports />} />
-          <Route path="/reports/sales-register" element={<SalesRegister />} />
-          <Route path="/reports/purchase-register" element={<PurchaseRegister />} />
-          <Route path="/reports/quotation-register" element={<QuotationRegister />} />
-          <Route path="/reports/sales-order-register" element={<SalesOrderRegister />} />
-          <Route path="/reports/delivery-note-register" element={<DeliveryNoteRegister />} />
-          <Route path="/reports/receivables" element={<Receivables />} />
-          <Route path="/reports/payables" element={<Payables />} />
+          <Route path="/reports/sales-register" element={<RouteGuard element={<SalesRegister />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="sales" />} />
+          <Route path="/reports/purchase-register" element={<RouteGuard element={<PurchaseRegister />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="purchase" />} />
+          <Route path="/reports/quotation-register" element={<RouteGuard element={<QuotationRegister />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="quotation" />} />
+          <Route path="/reports/sales-order-register" element={<RouteGuard element={<SalesOrderRegister />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="sales_order" />} />
+          <Route path="/reports/delivery-note-register" element={<RouteGuard element={<DeliveryNoteRegister />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="delivery_note" />} />
+          <Route path="/reports/receivables" element={<RouteGuard element={<Receivables />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="receipt" />} />
+          <Route path="/reports/payables" element={<RouteGuard element={<Payables />} isAuthenticated={isAuthenticated} isLoading={isUserLoading} currentUser={currentUser} moduleKey="payment" />} />
           <Route path="/reports/outstanding" element={<Outstanding />} />
           <Route path="/reports/movement" element={<MovementAnalysis />} />
           <Route path="/reports/summary" element={<StockSummary />} />

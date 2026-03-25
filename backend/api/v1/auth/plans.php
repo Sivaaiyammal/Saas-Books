@@ -12,22 +12,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 
+function tableHasColumn(PDO $pdo, string $tableName, string $columnName): bool {
+    $stmt = $pdo->prepare('SHOW COLUMNS FROM `' . $tableName . '` LIKE ?');
+    $stmt->execute([$columnName]);
+    return (bool)$stmt->fetch();
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     ApiResponse::error('Method not allowed', 405);
 }
 
 try {
-    $stmt = $pdo->query("
-        SELECT id, code, name, amount, currency, validity_days, max_users, max_companies, features
-        FROM plans
-        WHERE status = 'active'
-        ORDER BY amount ASC
-    ");
+    $selectFields = ['id', 'code', 'name', 'amount', 'currency', 'validity_days', 'status'];
+    if (tableHasColumn($pdo, 'plans', 'max_users')) {
+        $selectFields[] = 'max_users';
+    }
+    if (tableHasColumn($pdo, 'plans', 'max_companies')) {
+        $selectFields[] = 'max_companies';
+    }
+    if (tableHasColumn($pdo, 'plans', 'features')) {
+        $selectFields[] = 'features';
+    }
+
+    $query = sprintf(
+        'SELECT %s FROM plans WHERE status = \'active\' ORDER BY amount ASC',
+        implode(', ', $selectFields)
+    );
+
+    $stmt = $pdo->query($query);
     $plans = $stmt->fetchAll();
 
-    // Decode features JSON for each plan
+    // Decode features JSON only when the column is present
     foreach ($plans as &$plan) {
-        $plan['features'] = json_decode($plan['features'] ?? '[]', true);
+        if (isset($plan['features'])) {
+            $plan['features'] = json_decode($plan['features'] ?? '[]', true);
+        }
     }
 
     ApiResponse::success(['plans' => $plans], 'Plans retrieved successfully');

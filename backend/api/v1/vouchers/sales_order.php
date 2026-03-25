@@ -28,12 +28,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/moduleAccess.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 $user = AuthMiddleware::authenticate();
+ModuleAccessHelper::requireModule($pdo, $user, 'sales_order', 'Sales Order');
 
 try {
     $pdo    = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
     // ─────────────────────────────────────────────────────────
@@ -179,6 +183,7 @@ try {
 
         $where  = ["o.order_type = 'Sales'", "o.status != 'Cancelled'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'o.company_id');
 
         if ($search) {
             $where[]  = "(o.order_no LIKE ? OR l.name LIKE ?)";
@@ -313,7 +318,7 @@ try {
                 ) VALUES (?, 'Sales', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Open', ?)
             ");
             $stmt->execute([
-                $input['company_id']      ?? null,
+                $companyId,
                 $orderNo,
                 $input['order_date'],
                 $input['expected_date']   ?? null,

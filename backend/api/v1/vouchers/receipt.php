@@ -29,13 +29,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/moduleAccess.php';
 require_once __DIR__ . '/../../../helpers/voucher.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 $user = AuthMiddleware::authenticate();
+ModuleAccessHelper::requireModule($pdo, $user, 'receipt', 'Receipt');
 
 try {
     $pdo = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
     // GET: Outstanding bills for a party (must be checked FIRST)
@@ -139,6 +143,7 @@ try {
 
         $where = ["v.voucher_type = 'Receipt'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'v.company_id');
 
         // Hide cancelled by default unless show_cancelled=1 or status=cancelled
         if ($status) {
@@ -274,7 +279,7 @@ try {
             // Generate receipt number
             $voucherNo = isset($input['voucher_no']) && $input['voucher_no']
                 ? $input['voucher_no']
-                : VoucherHelper::generateVoucherNo($pdo, 'Receipt', $input['company_id'] ?? null);
+                : VoucherHelper::generateVoucherNo($pdo, 'Receipt', $companyId, 49);
 
             // Calculate total (with optional deductions)
             $tdsAmount = floatval($input['tds_amount'] ?? 0);
@@ -291,7 +296,7 @@ try {
             ");
 
             $stmt->execute([
-                $input['company_id'] ?? null,
+                $companyId,
                 $voucherNo,
                 $input['voucher_date'],
                 $input['reference_no'] ?? null,

@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 // Authenticate user
@@ -19,6 +20,7 @@ $user = AuthMiddleware::authenticate();
 
 try {
     $pdo = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
     // GET: List all item groups or get single item group
@@ -57,6 +59,7 @@ try {
         // Build query
         $where = ["ig.status = 'active'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'ig.company_id');
 
         if ($search) {
             $where[] = "(ig.name LIKE ? OR ig.description LIKE ?)";
@@ -159,8 +162,8 @@ try {
         }
 
         // Check for duplicate name
-        $stmt = $pdo->prepare("SELECT id FROM item_groups WHERE name = ? AND status = 'active'");
-        $stmt->execute([$name]);
+        $stmt = $pdo->prepare("SELECT id FROM item_groups WHERE name = ? AND company_id = ? AND status = 'active'");
+        $stmt->execute([$name, $companyId]);
         if ($stmt->fetch()) {
             ApiResponse::validationError([
                 'name' => ['Item group with this name already exists']
@@ -169,11 +172,11 @@ try {
 
         // Insert item group
         $stmt = $pdo->prepare("
-            INSERT INTO item_groups (name, parent_id, group_type, description)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO item_groups (company_id, name, parent_id, group_type, description)
+            VALUES (?, ?, ?, ?, ?)
         ");
 
-        $stmt->execute([$name, $parent_id, $group_type, $description]);
+        $stmt->execute([$companyId, $name, $parent_id, $group_type, $description]);
         $itemGroupId = $pdo->lastInsertId();
 
         // Get created item group
@@ -257,8 +260,8 @@ try {
         }
 
         // Check for duplicate name (excluding current group)
-        $stmt = $pdo->prepare("SELECT id FROM item_groups WHERE name = ? AND id != ? AND status = 'active'");
-        $stmt->execute([$name, $id]);
+        $stmt = $pdo->prepare("SELECT id FROM item_groups WHERE name = ? AND company_id = ? AND id != ? AND status = 'active'");
+        $stmt->execute([$name, $companyId, $id]);
         if ($stmt->fetch()) {
             ApiResponse::validationError([
                 'name' => ['Item group with this name already exists']

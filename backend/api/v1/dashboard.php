@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../helpers/apiResponse.php';
+require_once __DIR__ . '/../../helpers/tenant.php';
 require_once __DIR__ . '/../../middleware/auth.php';
 
 $user = AuthMiddleware::authenticate();
@@ -38,7 +39,7 @@ try {
     $method = $_SERVER['REQUEST_METHOD'];
 
     if ($method === 'GET') {
-        $companyId = isset($_GET['company_id']) ? (int)$_GET['company_id'] : 0;
+        $companyId = TenantHelper::getCompanyId($user, $_GET['company_id'] ?? null);
         $itemsHasCompanyId = tableHasColumn($pdo, 'items', 'company_id');
 
         $today = new DateTime('today');

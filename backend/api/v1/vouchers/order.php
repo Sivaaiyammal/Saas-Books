@@ -23,12 +23,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/moduleAccess.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 $user = AuthMiddleware::authenticate();
 
 try {
     $pdo = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
     // GET: List all orders or get single order
@@ -92,6 +95,11 @@ try {
         // List all orders with filters
         $search = $_GET['search'] ?? '';
         $order_type = $_GET['order_type'] ?? '';
+        if ($order_type === 'Purchase') {
+            ModuleAccessHelper::requireModule($pdo, $user, 'purchase_order', 'Purchase Order');
+        } else {
+            ModuleAccessHelper::requireModule($pdo, $user, 'sales_order', 'Sales Order');
+        }
         $status = $_GET['status'] ?? '';
         $party_id = $_GET['party_id'] ?? '';
         $from_date = $_GET['from_date'] ?? '';
@@ -103,6 +111,7 @@ try {
 
         $where = ["o.status != 'Cancelled'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'o.company_id');
 
         if ($search) {
             $where[] = "(o.order_no LIKE ? OR l.name LIKE ?)";
@@ -205,6 +214,12 @@ try {
             ApiResponse::validationError(['order_type' => ['Order type must be Sales or Purchase']]);
         }
 
+        if ($input['order_type'] === 'Purchase') {
+            ModuleAccessHelper::requireModule($pdo, $user, 'purchase_order', 'Purchase Order');
+        } else {
+            ModuleAccessHelper::requireModule($pdo, $user, 'sales_order', 'Sales Order');
+        }
+
         // Validate date format
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $input['order_date'])) {
             ApiResponse::validationError(['order_date' => ['Invalid date format (use Y-m-d)']]);
@@ -266,7 +281,7 @@ try {
             ");
 
             $stmt->execute([
-                $input['company_id'] ?? null,
+                $companyId,
                 $input['order_type'],
                 $orderNo,
                 $input['order_date'],

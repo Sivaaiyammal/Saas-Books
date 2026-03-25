@@ -63,13 +63,35 @@ class AuthHelper {
                     u.name,
                     u.email,
                     u.phone,
-                    u.company_id,
+                    COALESCE(
+                        u.company_id,
+                        (
+                            SELECT cu.company_id
+                            FROM company_users cu
+                            WHERE cu.user_id = u.id
+                              AND (cu.status = 'active' OR cu.status IS NULL)
+                            ORDER BY cu.is_default DESC, cu.id ASC
+                            LIMIT 1
+                        )
+                    ) AS company_id,
+                    c.name AS company_name,
                     u.role_id,
                     COALESCE(r.name, u.role, 'user') AS role,
                     u.status,
                     u.created_at,
                     u.last_login
                 FROM users u
+                LEFT JOIN companies c ON c.id = COALESCE(
+                    u.company_id,
+                    (
+                        SELECT cu2.company_id
+                        FROM company_users cu2
+                        WHERE cu2.user_id = u.id
+                          AND (cu2.status = 'active' OR cu2.status IS NULL)
+                        ORDER BY cu2.is_default DESC, cu2.id ASC
+                        LIMIT 1
+                    )
+                )
                 LEFT JOIN roles r ON r.id = u.role_id
                 WHERE u.id = ?
                 LIMIT 1

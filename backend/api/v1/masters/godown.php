@@ -12,12 +12,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 $user = AuthMiddleware::authenticate();
 
 try {
     $pdo = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
     if ($method === 'GET') {
@@ -38,6 +40,7 @@ try {
 
         $where = ["status = 'active'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'company_id');
 
         if ($search) {
             $where[] = "(name LIKE ? OR code LIKE ? OR city LIKE ? OR manager_name LIKE ? OR gstin LIKE ?)";
@@ -100,16 +103,16 @@ try {
             ApiResponse::validationError(['email' => ['Invalid email format']]);
         }
 
-        $stmt = $pdo->prepare("SELECT id FROM godowns WHERE name = ? AND status = 'active'");
-        $stmt->execute([$name]);
+        $stmt = $pdo->prepare("SELECT id FROM godowns WHERE name = ? AND company_id = ? AND status = 'active'");
+        $stmt->execute([$name, $companyId]);
         if ($stmt->fetch()) ApiResponse::validationError(['name' => ['Godown with this name already exists']]);
 
         if ($is_default) {
             $pdo->exec("UPDATE godowns SET is_default = 0");
         }
 
-        $stmt = $pdo->prepare("INSERT INTO godowns (name, code, address, city, state, pincode, phone, email, manager_name, capacity, is_default, description, gstin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $code, $address, $city, $state, $pincode, $phone, $email, $manager_name, $capacity, $is_default, $description, $gstin]);
+        $stmt = $pdo->prepare("INSERT INTO godowns (company_id, name, code, address, city, state, pincode, phone, email, manager_name, capacity, is_default, description, gstin) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$companyId, $name, $code, $address, $city, $state, $pincode, $phone, $email, $manager_name, $capacity, $is_default, $description, $gstin]);
         $godownId = $pdo->lastInsertId();
 
         $stmt = $pdo->prepare("SELECT * FROM godowns WHERE id = ?");
@@ -149,8 +152,8 @@ try {
             ApiResponse::validationError(['email' => ['Invalid email format']]);
         }
 
-        $stmt = $pdo->prepare("SELECT id FROM godowns WHERE name = ? AND id != ? AND status = 'active'");
-        $stmt->execute([$name, $id]);
+        $stmt = $pdo->prepare("SELECT id FROM godowns WHERE name = ? AND company_id = ? AND id != ? AND status = 'active'");
+        $stmt->execute([$name, $companyId, $id]);
         if ($stmt->fetch()) ApiResponse::validationError(['name' => ['Godown with this name already exists']]);
 
         if ($is_default) {

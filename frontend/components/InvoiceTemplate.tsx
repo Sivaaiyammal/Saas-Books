@@ -5,9 +5,6 @@ import { QRCodeSVG } from 'qrcode.react';
 interface InvoiceItem {
   item_name: string;
   colour?: string;
-  count?: string;
-  dia?: string;
-  gsm?: string;
   hsn_code?: string;
   quantity: string;
   unit_symbol?: string;
@@ -511,13 +508,6 @@ const InvoiceTemplate = forwardRef<HTMLDivElement, InvoiceTemplateProps>(
                                 <td className="py-2 border-r-2 border-slate-900 align-top text-xs text-black">{globalIndex + 1}</td>
                                 <td className="py-2 border-r-2 border-slate-900 text-left px-3 align-top">
                                   <div className="font-black text-xs tracking-tight uppercase">{item.item_name}</div>
-                                  {(item.gsm || item.dia || item.count) && (
-                                    <div className="text-[10px] text-slate-500 mt-1 font-medium flex gap-2">
-                                      {item.gsm && <span>GSM: {item.gsm}</span>}
-                                      {item.dia && <span>DIA: {item.dia}</span>}
-                                      {item.count && <span>COUNT: {item.count}</span>}
-                                    </div>
-                                  )}
                                 </td>
                                 <td className="py-2 border-r-2 border-slate-900 align-top uppercase text-xs">{item.colour || '--'}</td>
                                 <td className="py-2 border-r-2 border-slate-900 align-top tracking-widest text-xs">{item.hsn_code || '--'}</td>

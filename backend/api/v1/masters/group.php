@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 // Authenticate user
@@ -19,6 +20,7 @@ $user = AuthMiddleware::authenticate();
 
 try {
     $pdo = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
     // GET: List all groups or get single group
@@ -67,8 +69,8 @@ try {
         $offset = ($page - 1) * $limit;
 
         // Build query
-        $where = ["g.status = 'active'"];
-        $params = [];
+        $where = ["g.status = 'active'", "(g.is_system = 1 OR g.company_id = ?)"];
+        $params = [$companyId];
 
         if ($search) {
             $where[] = "g.name LIKE ?";
@@ -162,7 +164,7 @@ try {
         $nature = $input['nature'];
         $parent_id = $input['parent_id'] ?? null;
         $affects_gross_profit = isset($input['affects_gross_profit']) ? (int)$input['affects_gross_profit'] : 0;
-        $company_id = $input['company_id'] ?? null;
+        $company_id = $companyId;
 
         // Validate nature
         if (!in_array($nature, ['Asset', 'Liability', 'Income', 'Expense'])) {
@@ -192,8 +194,8 @@ try {
         }
 
         // Check for duplicate name
-        $stmt = $pdo->prepare("SELECT id FROM `groups` WHERE name = ? AND status = 'active'");
-        $stmt->execute([$name]);
+        $stmt = $pdo->prepare("SELECT id FROM `groups` WHERE name = ? AND (is_system = 1 OR company_id = ?) AND status = 'active'");
+        $stmt->execute([$name, $company_id]);
         if ($stmt->fetch()) {
             ApiResponse::validationError([
                 'name' => ['Group with this name already exists']
@@ -304,8 +306,8 @@ try {
         }
 
         // Check for duplicate name (excluding current group)
-        $stmt = $pdo->prepare("SELECT id FROM `groups` WHERE name = ? AND id != ? AND status = 'active'");
-        $stmt->execute([$name, $id]);
+        $stmt = $pdo->prepare("SELECT id FROM `groups` WHERE name = ? AND id != ? AND (is_system = 1 OR company_id = ?) AND status = 'active'");
+        $stmt->execute([$name, $id, $companyId]);
         if ($stmt->fetch()) {
             ApiResponse::validationError([
                 'name' => ['Group with this name already exists']

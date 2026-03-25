@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 // Authenticate user
@@ -54,6 +55,7 @@ function parseBoolFlag($value): int {
 
 try {
     $pdo = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
     // GET: List all ledgers or get single ledger
@@ -201,6 +203,7 @@ try {
         // Build query
         $where = ["l.status = 'active'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'l.company_id');
 
         if ($search) {
             $where[] = "(l.name LIKE ? OR l.address LIKE ? OR l.phone LIKE ? OR l.email LIKE ?)";
@@ -336,7 +339,7 @@ try {
         $group_id = (int)$input['group_id'];
         $opening_balance = isset($input['opening_balance']) ? floatval($input['opening_balance']) : 0.00;
         $opening_type = $input['opening_type'] ?? 'Dr';
-        $company_id = $input['company_id'] ?? null;
+        $company_id = $companyId;
         $address = $input['address'] ?? null;
         $city = $input['city'] ?? null;
         $state = $input['state'] ?? null;
@@ -414,8 +417,8 @@ try {
         }
 
         // Check for duplicate name within same group
-        $stmt = $pdo->prepare("SELECT id FROM ledgers WHERE name = ? AND group_id = ? AND status = 'active'");
-        $stmt->execute([$name, $group_id]);
+        $stmt = $pdo->prepare("SELECT id FROM ledgers WHERE name = ? AND group_id = ? AND company_id = ? AND status = 'active'");
+        $stmt->execute([$name, $group_id, $company_id]);
         if ($stmt->fetch()) {
             ApiResponse::validationError([
                 'name' => ['Ledger with this name already exists in the same group']
@@ -614,8 +617,8 @@ try {
         }
 
         // Check for duplicate name (excluding current ledger)
-        $stmt = $pdo->prepare("SELECT id FROM ledgers WHERE name = ? AND group_id = ? AND id != ? AND status = 'active'");
-        $stmt->execute([$name, $group_id, $id]);
+        $stmt = $pdo->prepare("SELECT id FROM ledgers WHERE name = ? AND group_id = ? AND company_id = ? AND id != ? AND status = 'active'");
+        $stmt->execute([$name, $group_id, $existingLedger['company_id'], $id]);
         if ($stmt->fetch()) {
             ApiResponse::validationError([
                 'name' => ['Ledger with this name already exists in the same group']

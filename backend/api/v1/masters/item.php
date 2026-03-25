@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 // Authenticate user
@@ -19,6 +20,7 @@ $user = AuthMiddleware::authenticate();
 
 try {
     $pdo = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
     // GET: List all items or get single item
@@ -83,12 +85,10 @@ try {
         // Build query
         $where = ["i.status != 'inactive'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'i.company_id');
 
         if ($search) {
-            $where[] = "(i.name LIKE ? OR i.alias LIKE ? OR i.item_code LIKE ? OR i.description LIKE ? OR i.colour LIKE ? OR i.gsm LIKE ? OR i.dia LIKE ? OR i.count LIKE ?)";
-            $params[] = "%$search%";
-            $params[] = "%$search%";
-            $params[] = "%$search%";
+            $where[] = "(i.name LIKE ? OR i.alias LIKE ? OR i.item_code LIKE ? OR i.description LIKE ? OR i.colour LIKE ?)";
             $params[] = "%$search%";
             $params[] = "%$search%";
             $params[] = "%$search%";
@@ -174,9 +174,6 @@ try {
             'hsn_code' => 'optional',
             'alias' => 'optional',
             'description' => 'optional',
-            'gsm' => 'optional',
-            'count' => 'optional',
-            'dia' => 'optional',
             'colour' => 'optional',
             'opening_stock' => 'optional',
             'opening_value' => 'optional',
@@ -202,9 +199,6 @@ try {
         $description = $input['description'] ?? null;
         $item_code = isset($input['item_code']) ? trim($input['item_code']) : null;
         $hsn_code = isset($input['hsn_code']) ? trim($input['hsn_code']) : null;
-        $gsm = isset($input['gsm']) ? trim($input['gsm']) : null;
-        $count = isset($input['count']) ? trim($input['count']) : null;
-        $dia = isset($input['dia']) ? trim($input['dia']) : null;
         $colour = isset($input['colour']) ? trim($input['colour']) : null;
         $item_group_id = isset($input['item_group_id']) ? (int)$input['item_group_id'] : null;
         $unit_id = isset($input['unit_id']) ? (int)$input['unit_id'] : null;
@@ -223,8 +217,8 @@ try {
 
         // Check if item_code is unique (if provided)
         if ($item_code) {
-            $stmt = $pdo->prepare("SELECT id FROM items WHERE item_code = ? AND status != 'inactive'");
-            $stmt->execute([$item_code]);
+            $stmt = $pdo->prepare("SELECT id FROM items WHERE item_code = ? AND company_id = ? AND status != 'inactive'");
+            $stmt->execute([$item_code, $companyId]);
             if ($stmt->fetch()) {
                 ApiResponse::validationError([
                     'item_code' => ['Item with this code already exists']
@@ -271,17 +265,17 @@ try {
         // Insert item
         $stmt = $pdo->prepare("
             INSERT INTO items (
-                item_group_id, name, colour, alias, description, item_code, hsn_code,
-                gsm, count, dia, unit_id, opening_stock, opening_value, opening_rate,
+                company_id, item_group_id, name, colour, alias, description, item_code, hsn_code,
+                unit_id, opening_stock, opening_value, opening_rate,
                 minimum_level, maximum_level, reorder_level,
                 standard_cost, standard_price, tax_id,
                 is_service, track_inventory, variant_of
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         $stmt->execute([
-            $item_group_id, $name, $colour, $alias, $description, $item_code, $hsn_code,
-            $gsm, $count, $dia, $unit_id, $opening_stock, $opening_value, $opening_rate,
+            $companyId, $item_group_id, $name, $colour, $alias, $description, $item_code, $hsn_code,
+            $unit_id, $opening_stock, $opening_value, $opening_rate,
             $minimum_level, $maximum_level, $reorder_level,
             $standard_cost, $standard_price, $tax_id,
             $is_service, $track_inventory, null
@@ -301,21 +295,18 @@ try {
         // Handle Variants Creation
         if (!empty($variants)) {
             foreach ($variants as $idx => $variant) {
-                // Generate Variant Name (e.g., "Cotton Fabric - Red 140GSM")
-                $vGsm = $variant['gsm'] ?? $gsm;
-                $vDia = $variant['dia'] ?? $dia;
-                $vCount = $variant['count'] ?? $count;
+                // Generate variant name using colour only
                 $vColour = $variant['colour'] ?? $colour;
 
-                $vName = $variant['name'] ?? ($name . ' - ' . ($vColour ?? '') . ' ' . ($vGsm ? $vGsm . 'GSM' : ''));
+                $vName = $variant['name'] ?? ($name . ' - ' . ($vColour ?? ''));
                 $vQty = isset($variant['opening_stock']) ? floatval($variant['opening_stock']) : 0;
                 $vRate = isset($variant['opening_rate']) ? floatval($variant['opening_rate']) : $opening_rate;
                 $vValue = $vQty * $vRate;
                 $vItemCode = $variant['item_code'] ?? ($item_code ? $item_code . '-' . ($idx + 1) : null);
 
                 $stmt->execute([
-                    $item_group_id, $vName, $vColour, $alias, $description, $vItemCode, $hsn_code,
-                    $vGsm, $vCount, $vDia, $unit_id, $vQty, $vValue, $vRate,
+                    $companyId, $item_group_id, $vName, $vColour, $alias, $description, $vItemCode, $hsn_code,
+                    $unit_id, $vQty, $vValue, $vRate,
                     $minimum_level, $maximum_level, $reorder_level,
                     $standard_cost, $standard_price, $tax_id,
                     $is_service, $track_inventory, $itemId // Link to Parent
@@ -392,9 +383,6 @@ try {
         $description = array_key_exists('description', $input) ? $input['description'] : $existingItem['description'];
         $item_code = isset($input['item_code']) ? trim($input['item_code']) : $existingItem['item_code'];
         $hsn_code = isset($input['hsn_code']) ? trim($input['hsn_code']) : $existingItem['hsn_code'];
-        $gsm = array_key_exists('gsm', $input) ? $input['gsm'] : $existingItem['gsm'];
-        $count = array_key_exists('count', $input) ? $input['count'] : $existingItem['count'];
-        $dia = array_key_exists('dia', $input) ? $input['dia'] : $existingItem['dia'];
         $colour = array_key_exists('colour', $input) ? $input['colour'] : $existingItem['colour'];
         $item_group_id = array_key_exists('item_group_id', $input) ? (!empty($input['item_group_id']) ? (int)$input['item_group_id'] : null) : $existingItem['item_group_id'];
         $unit_id = array_key_exists('unit_id', $input) ? (!empty($input['unit_id']) ? (int)$input['unit_id'] : null) : $existingItem['unit_id'];
@@ -421,8 +409,8 @@ try {
 
         // Check if item_code is unique (if changed)
         if ($item_code && $item_code !== $existingItem['item_code']) {
-            $stmt = $pdo->prepare("SELECT id FROM items WHERE item_code = ? AND id != ? AND status != 'inactive'");
-            $stmt->execute([$item_code, $id]);
+            $stmt = $pdo->prepare("SELECT id FROM items WHERE item_code = ? AND company_id = ? AND id != ? AND status != 'inactive'");
+            $stmt->execute([$item_code, $companyId, $id]);
             if ($stmt->fetch()) {
                 ApiResponse::validationError([
                     'item_code' => ['Item with this code already exists']
@@ -470,7 +458,7 @@ try {
         $stmt = $pdo->prepare("
             UPDATE items
             SET item_group_id = ?, name = ?, colour = ?, alias = ?, description = ?,
-                item_code = ?, hsn_code = ?, gsm = ?, count = ?, dia = ?, unit_id = ?,
+                item_code = ?, hsn_code = ?, unit_id = ?,
                 opening_stock = ?, opening_value = ?, opening_rate = ?,
                 minimum_level = ?, maximum_level = ?, reorder_level = ?,
                 standard_cost = ?, standard_price = ?, tax_id = ?,
@@ -480,7 +468,7 @@ try {
 
         $stmt->execute([
             $item_group_id, $name, $colour, $alias, $description,
-            $item_code, $hsn_code, $gsm, $count, $dia, $unit_id,
+            $item_code, $hsn_code, $unit_id,
             $opening_stock, $opening_value, $opening_rate,
             $minimum_level, $maximum_level, $reorder_level,
             $standard_cost, $standard_price, $tax_id,
@@ -518,13 +506,10 @@ try {
             foreach ($variants as $idx => $variant) {
                 $vId = isset($variant['id']) && $variant['id'] !== '' && $variant['id'] !== null ? (int)$variant['id'] : null;
 
-                $vGsm = array_key_exists('gsm', $variant) ? $variant['gsm'] : $gsm;
-                $vDia = array_key_exists('dia', $variant) ? $variant['dia'] : $dia;
-                $vCount = array_key_exists('count', $variant) ? $variant['count'] : $count;
                 $vColour = array_key_exists('colour', $variant) ? $variant['colour'] : $colour;
                 $vName = isset($variant['name']) && $variant['name'] !== ''
                     ? $variant['name']
-                    : ($name . ' - ' . ($vColour ?? '') . ' ' . ($vGsm ? $vGsm . 'GSM' : ''));
+                    : ($name . ' - ' . ($vColour ?? ''));
 
                 $vQty = isset($variant['opening_stock']) ? floatval($variant['opening_stock']) : 0;
                 $vRate = isset($variant['opening_rate']) ? floatval($variant['opening_rate']) : $opening_rate;
@@ -536,7 +521,7 @@ try {
 
                     $stmtUpdate = $pdo->prepare("
                         UPDATE items SET
-                            name = ?, colour = ?, gsm = ?, count = ?, dia = ?,
+                            name = ?, colour = ?,
                             opening_stock = ?, opening_rate = ?, opening_value = ?,
                             item_group_id = ?, unit_id = ?, hsn_code = ?, tax_id = ?,
                             alias = ?, description = ?, minimum_level = ?, maximum_level = ?,
@@ -546,7 +531,7 @@ try {
                     ");
 
                     $stmtUpdate->execute([
-                        $vName, $vColour, $vGsm, $vCount, $vDia,
+                        $vName, $vColour,
                         $vQty, $vRate, $vValue,
                         $item_group_id, $unit_id, $hsn_code, $tax_id,
                         $alias, $description, $minimum_level, $maximum_level,
@@ -583,17 +568,17 @@ try {
 
                     $stmtInsert = $pdo->prepare("
                         INSERT INTO items (
-                            item_group_id, name, colour, alias, description, item_code, hsn_code,
-                            gsm, count, dia, unit_id, opening_stock, opening_value, opening_rate,
+                            company_id, item_group_id, name, colour, alias, description, item_code, hsn_code,
+                            unit_id, opening_stock, opening_value, opening_rate,
                             minimum_level, maximum_level, reorder_level,
                             standard_cost, standard_price, tax_id,
                             is_service, track_inventory, variant_of
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ");
 
                     $stmtInsert->execute([
-                        $item_group_id, $vName, $vColour, $alias, $description, $vItemCode, $hsn_code,
-                        $vGsm, $vCount, $vDia, $unit_id, $vQty, $vValue, $vRate,
+                        $companyId, $item_group_id, $vName, $vColour, $alias, $description, $vItemCode, $hsn_code,
+                        $unit_id, $vQty, $vValue, $vRate,
                         $minimum_level, $maximum_level, $reorder_level,
                         $standard_cost, $standard_price, $tax_id,
                         $is_service, $track_inventory, $id

@@ -28,23 +28,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/moduleAccess.php';
 require_once __DIR__ . '/../../../helpers/voucher.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
-
-// Allow next_voucher_no endpoint without authentication
-if (!isset($_GET['next_voucher_no'])) {
-    $user = AuthMiddleware::authenticate();
-}
 
 try {
     $pdo = getDBConnection();
+    $user = AuthMiddleware::authenticate();
+    ModuleAccessHelper::requireModule($pdo, $user, 'sales', 'Sales');
+    $companyId = TenantHelper::getCompanyId($user, $_GET['company_id'] ?? null);
     $method = $_SERVER['REQUEST_METHOD'];
 
     // GET: List sales invoices or get single
     if ($method === 'GET') {
         // Get next voucher number
         if (isset($_GET['next_voucher_no']) && $_GET['next_voucher_no'] === 'true') {
-            $nextVoucherNo = VoucherHelper::generateVoucherNo($pdo, 'Sales', $_GET['company_id'] ?? null, 49);
+            $nextVoucherNo = VoucherHelper::generateVoucherNo($pdo, 'Sales', $companyId, 1);
             ApiResponse::success([
                 'next_voucher_no' => $nextVoucherNo
             ], 'Next voucher number retrieved successfully');
@@ -82,7 +82,7 @@ try {
             // Attach items for each DN so the frontend can auto-fill the Sales form
             $stmtItems = $pdo->prepare("
                 SELECT
-                    vi.id, vi.product_id, vi.item_name, vi.colour, vi.gsm, vi.dia, vi.count, vi.roll,
+                    vi.id, vi.product_id, vi.item_name, vi.colour,
                     vi.quantity, vi.unit_id, vi.rate, vi.amount, vi.godown_id, vi.description,
                     vi.order_item_id,
                     i.item_code, i.hsn_code,
@@ -215,6 +215,7 @@ try {
 
         $where = ["v.voucher_type = 'Sales'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'v.company_id');
 
         if ($search) {
             $where[] = "(v.voucher_no LIKE ? OR v.reference_no LIKE ? OR l.name LIKE ?)";
@@ -348,7 +349,7 @@ try {
             // Generate invoice number
             $voucherNo = isset($input['voucher_no']) && $input['voucher_no']
                 ? $input['voucher_no']
-                : VoucherHelper::generateVoucherNo($pdo, 'Sales', $input['company_id'] ?? null, 49);
+                : VoucherHelper::generateVoucherNo($pdo, 'Sales', $companyId, 1);
 
             // Calculate totals
             $subtotal = 0;
@@ -393,10 +394,6 @@ try {
                     'product_id' => $item['item_id'] ?? $item['product_id'] ?? null,
                     'item_name' => $item['item_name'],
                     'colour' => $item['colour'] ?? null,
-                    'gsm' => $item['gsm'] ?? null,
-                    'dia' => $item['dia'] ?? null,
-                    'count' => $item['count'] ?? null,
-                    'roll' => $item['roll'] ?? null,
                     'quantity' => $qty,
                     'unit_id' => $item['unit_id'] ?? null,
                     'rate' => $rate,
@@ -488,7 +485,7 @@ try {
             ");
 
             $stmt->execute([
-                $input['company_id'] ?? null,
+                $companyId,
                 $voucherNo,
                 $input['voucher_date'],
                 $input['reference_no'] ?? null,
@@ -525,10 +522,10 @@ try {
             // Insert items
             $stmtItem = $pdo->prepare("
                 INSERT INTO voucher_items (
-                    voucher_id, product_id, item_name, colour, gsm, dia, count, roll,
+                    voucher_id, product_id, item_name, colour,
                     quantity, unit_id, rate, discount_percent, discount_amount,
                     tax_id, tax_percent, cgst, sgst, igst, tax_amount, amount, godown_id, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($processedItems as $item) {
@@ -537,10 +534,6 @@ try {
                     $item['product_id'],
                     $item['item_name'],
                     $item['colour'],
-                    $item['gsm'],
-                    $item['dia'],
-                    $item['count'],
-                    $item['roll'],
                     $item['quantity'],
                     $item['unit_id'],
                     $item['rate'],
@@ -958,10 +951,6 @@ try {
                     'product_id' => $item['item_id'] ?? $item['product_id'] ?? null,
                     'item_name' => $item['item_name'],
                     'colour' => $item['colour'] ?? null,
-                    'gsm' => $item['gsm'] ?? null,
-                    'dia' => $item['dia'] ?? null,
-                    'count' => $item['count'] ?? null,
-                    'roll' => $item['roll'] ?? null,
                     'quantity' => $qty,
                     'unit_id' => $item['unit_id'] ?? null,
                     'rate' => $rate,
@@ -1111,10 +1100,10 @@ try {
             // 5. INSERT NEW ITEMS & UPDATE STOCK
             $stmtItem = $pdo->prepare("
                 INSERT INTO voucher_items (
-                    voucher_id, product_id, item_name, colour, gsm, dia, count, roll,
+                    voucher_id, product_id, item_name, colour,
                     quantity, unit_id, rate, discount_percent, discount_amount,
                     tax_id, tax_percent, cgst, sgst, igst, tax_amount, amount, godown_id, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($processedItems as $item) {
@@ -1123,10 +1112,6 @@ try {
                     $item['product_id'],
                     $item['item_name'],
                     $item['colour'],
-                    $item['gsm'],
-                    $item['dia'],
-                    $item['count'],
-                    $item['roll'],
                     $item['quantity'],
                     $item['unit_id'],
                     $item['rate'],
