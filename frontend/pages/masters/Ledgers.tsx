@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Plus,
   Search,
@@ -291,6 +291,23 @@ const Ledgers: React.FC = () => {
     return matchesSearch && matchesGroup && matchesNature;
   });
 
+  const ledgerCodeById = useMemo(() => {
+    const sequence = new Map<number, string>();
+    [...ledgers]
+      .sort((a, b) => Number(a.id) - Number(b.id))
+      .forEach((ledger, index) => {
+        sequence.set(ledger.id, `ACC-${index + 1}`);
+      });
+    return sequence;
+  }, [ledgers]);
+
+  const getLedgerCode = (ledgerId?: number) => {
+    if (!ledgerId) {
+      return 'ACC-';
+    }
+    return ledgerCodeById.get(ledgerId) || `ACC-${ledgerId}`;
+  };
+
   const getNatureColor = (nature: string) => {
     switch (nature.toLowerCase()) {
       case 'asset': return 'bg-emerald-50 text-emerald-600 border-emerald-200';
@@ -451,7 +468,7 @@ const Ledgers: React.FC = () => {
                         </div>
                         <div>
                           <div className="font-bold text-slate-900 text-sm">{ledger.name}</div>
-                          <div className="text-[10px] text-slate-400 font-bold mt-0.5 tracking-widest">ACC-{ledger.id}</div>
+                          <div className="text-[10px] text-slate-400 font-bold mt-0.5 tracking-widest">{getLedgerCode(ledger.id)}</div>
                         </div>
                       </div>
                     </td>
@@ -540,7 +557,7 @@ const Ledgers: React.FC = () => {
                         {ledger.name}
                       </h3>
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                        ACC-{ledger.id}
+                        {getLedgerCode(ledger.id)}
                       </p>
                     </div>
 
@@ -979,7 +996,7 @@ const Ledgers: React.FC = () => {
                 </div>
                 <div>
                   <h2 className="text-xl font-black text-slate-900">Ledger</h2>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-0.5">ACC-{selectedLedger.id}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-0.5">{getLedgerCode(selectedLedger.id)}</p>
                 </div>
               </div>
               <button onClick={() => setIsViewModalOpen(false)} className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-400 hover:text-rose-500 transition-all shadow-sm active:scale-90">

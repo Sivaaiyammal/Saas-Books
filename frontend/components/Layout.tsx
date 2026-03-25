@@ -25,7 +25,7 @@ import {
   Building2,
   Wallet
 } from 'lucide-react';
-import { authApi, buildFinancialYearRange, getCurrentFinancialYearLabel, getSelectedFinancialYearLabel, setSelectedFinancialYearLabel } from '../services/api';
+import { authApi, FinancialYearOption, getSelectedFinancialYearId, getSelectedFinancialYearLabel, setSelectedFinancialYearId, setSelectedFinancialYearLabel, settingsApi } from '../services/api';
 
 interface LayoutProps {
   onLogout: () => void;
@@ -46,6 +46,8 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isFyOpen, setIsFyOpen] = useState(false);
+  const [financialYears, setFinancialYears] = useState<FinancialYearOption[]>([]);
+  const [selectedFinancialYearIdState, setSelectedFinancialYearIdState] = useState<number | null>(getSelectedFinancialYearId());
   const [selectedFinancialYear, setSelectedFinancialYear] = useState(getSelectedFinancialYearLabel());
   const [openMenus, setOpenMenus] = useState<string[]>(['Masters', 'Vouchers']);
   const [user, setUser] = useState<any>(null);
@@ -57,18 +59,6 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
   const profileRef = useRef<HTMLDivElement>(null);
   const notifyRef = useRef<HTMLDivElement>(null);
   const fyRef = useRef<HTMLDivElement>(null);
-
-  const getFinancialYearOptions = () => {
-    const currentLabel = getCurrentFinancialYearLabel();
-    const currentStartYear = parseInt(currentLabel.split('-')[0], 10);
-    const options: string[] = [];
-    for (let year = currentStartYear; year >= currentStartYear - 5; year--) {
-      options.push(buildFinancialYearRange(year).label);
-    }
-    return options;
-  };
-
-  const financialYearOptions = getFinancialYearOptions();
 
   // Responsive Sync
   useEffect(() => {
@@ -91,9 +81,23 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [userRes] = await Promise.all([authApi.getMe()]);
+        const [userRes, fyRes] = await Promise.all([authApi.getMe(), settingsApi.getFinancialYears()]);
         if (userRes.success && userRes.data?.user) {
           setUser(userRes.data.user);
+        }
+
+        if (fyRes.success && fyRes.data?.financial_years) {
+          const years = fyRes.data.financial_years;
+          setFinancialYears(years);
+
+          if (years.length > 0) {
+            const selectedId = getSelectedFinancialYearId();
+            const selected = years.find(y => y.id === selectedId) || years.find(y => Number(y.is_current) === 1) || years[0];
+            setSelectedFinancialYearIdState(selected.id);
+            setSelectedFinancialYearLabel(selected.code);
+            setSelectedFinancialYear(selected.code);
+            setSelectedFinancialYearId(selected.id);
+          }
         }
       } catch (err) {
         console.error('Layout data error:', err);
@@ -118,9 +122,17 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
     setOpenMenus(prev => prev.includes(name) ? prev.filter(m => m !== name) : [...prev, name]);
   };
 
-  const handleFinancialYearSelect = (fyLabel: string) => {
-    setSelectedFinancialYear(fyLabel);
-    setSelectedFinancialYearLabel(fyLabel);
+  const handleFinancialYearSelect = async (fy: FinancialYearOption) => {
+    try {
+      await settingsApi.setCurrentFinancialYear(fy.id);
+    } catch (e) {
+      console.warn('Unable to persist current financial year on server, using local selection.', e);
+    }
+
+    setSelectedFinancialYearIdState(fy.id);
+    setSelectedFinancialYear(fy.code);
+    setSelectedFinancialYearLabel(fy.code);
+    setSelectedFinancialYearId(fy.id);
     setIsFyOpen(false);
     window.location.reload();
   };
@@ -366,13 +378,13 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
 
               {isFyOpen && (
                 <div className="absolute right-0 mt-2 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-[160] overflow-hidden">
-                  {financialYearOptions.map((fy) => (
+                  {financialYears.map((fy) => (
                     <button
-                      key={fy}
+                      key={fy.id}
                       onClick={() => handleFinancialYearSelect(fy)}
-                      className={`w-full text-left px-3 py-2.5 text-xs font-bold transition-colors ${fy === selectedFinancialYear ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}
+                      className={`w-full text-left px-3 py-2.5 text-xs font-bold transition-colors ${fy.id === selectedFinancialYearIdState ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}
                     >
-                      FY {fy}
+                      FY {fy.code}
                     </button>
                   ))}
                 </div>

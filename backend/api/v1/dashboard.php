@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../helpers/apiResponse.php';
+require_once __DIR__ . '/../../helpers/financialYear.php';
 require_once __DIR__ . '/../../helpers/tenant.php';
 require_once __DIR__ . '/../../middleware/auth.php';
 
@@ -40,6 +41,7 @@ try {
 
     if ($method === 'GET') {
         $companyId = TenantHelper::getCompanyId($user, $_GET['company_id'] ?? null);
+        FinancialYearHelper::bootstrap($pdo);
         $itemsHasCompanyId = tableHasColumn($pdo, 'items', 'company_id');
 
         $today = new DateTime('today');
@@ -50,8 +52,17 @@ try {
         $defaultFrom = sprintf('%04d-04-01', $fyStartYear);
         $defaultTo = sprintf('%04d-03-31', $fyStartYear + 1);
 
+        $requestedFyId = isset($_GET['financial_year_id']) ? (int)$_GET['financial_year_id'] : 0;
         $fromDateRaw = $_GET['from_date'] ?? $defaultFrom;
         $toDateRaw = $_GET['to_date'] ?? $defaultTo;
+
+        if ($requestedFyId > 0) {
+            $requestedFy = FinancialYearHelper::getById($pdo, $companyId, $requestedFyId);
+            if ($requestedFy) {
+                $fromDateRaw = $requestedFy['start_date'];
+                $toDateRaw = $requestedFy['end_date'];
+            }
+        }
 
         $fromDate = DateTime::createFromFormat('Y-m-d', $fromDateRaw);
         $toDate = DateTime::createFromFormat('Y-m-d', $toDateRaw);

@@ -30,6 +30,7 @@ require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
 require_once __DIR__ . '/../../../helpers/moduleAccess.php';
 require_once __DIR__ . '/../../../helpers/voucher.php';
+require_once __DIR__ . '/../../../helpers/financialYear.php';
 require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
@@ -38,6 +39,7 @@ try {
     $user = AuthMiddleware::authenticate();
     ModuleAccessHelper::requireModule($pdo, $user, 'sales', 'Sales');
     $companyId = TenantHelper::getCompanyId($user, $_GET['company_id'] ?? null);
+    FinancialYearHelper::bootstrap($pdo);
     $method = $_SERVER['REQUEST_METHOD'];
 
     // GET: List sales invoices or get single
@@ -209,6 +211,7 @@ try {
         $party_id = $_GET['party_id'] ?? '';
         $from_date = $_GET['from_date'] ?? '';
         $to_date = $_GET['to_date'] ?? '';
+        $financial_year_id = isset($_GET['financial_year_id']) ? (int)$_GET['financial_year_id'] : 0;
         $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
         $offset = ($page - 1) * $limit;
@@ -242,6 +245,11 @@ try {
         if ($to_date) {
             $where[] = "v.voucher_date <= ?";
             $params[] = $to_date;
+        }
+
+        if ($financial_year_id > 0) {
+            $where[] = "v.financial_year_id = ?";
+            $params[] = $financial_year_id;
         }
 
         $whereClause = implode(' AND ', $where);
@@ -471,9 +479,15 @@ try {
             $billingFromDN  = $deliveryNoteId !== null;
 
             // Create voucher
+            $resolvedFy = FinancialYearHelper::ensureYear($pdo, $companyId, $input['voucher_date']);
+            if (($resolvedFy['status'] ?? 'open') === 'closed') {
+                ApiResponse::error('Selected financial year is closed', 400);
+            }
+
             $stmt = $pdo->prepare("
                 INSERT INTO vouchers (
                     company_id, voucher_type, voucher_no, voucher_date, reference_no,
+                    financial_year_id, financial_year,
                     party_ledger_id, order_id, delivery_note_id,
                     billing_name, billing_address, billing_city, billing_state, billing_pincode, billing_gstin, billing_phone,
                     consignee_same_as_billing,
@@ -481,7 +495,7 @@ try {
                     place_of_supply,
                     vehicle_no, transporter_name, transporter_id,
                     total_amount, narration, status, created_by
-                ) VALUES (?, 'Sales', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, 'Sales', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             $stmt->execute([
@@ -489,6 +503,8 @@ try {
                 $voucherNo,
                 $input['voucher_date'],
                 $input['reference_no'] ?? null,
+                (int)$resolvedFy['id'],
+                $resolvedFy['code'],
                 $input['party_ledger_id'],
                 !empty($input['order_id']) ? (int)$input['order_id'] : null,
                 $deliveryNoteId,
@@ -815,6 +831,10 @@ try {
             ApiResponse::error('Cancelled invoices cannot be edited', 400);
         }
 
+        if (FinancialYearHelper::isVoucherYearClosed($pdo, $id)) {
+            ApiResponse::error('Closed financial year vouchers cannot be edited', 400);
+        }
+
         // Validation
         $rules = [
             'party_ledger_id' => 'required',
@@ -1027,11 +1047,18 @@ try {
                 : $existing['voucher_no'];
 
             // 4. UPDATE VOUCHER HEADER
+            $resolvedFy = FinancialYearHelper::ensureYear($pdo, $companyId, $input['voucher_date']);
+            if (($resolvedFy['status'] ?? 'open') === 'closed') {
+                ApiResponse::error('Selected financial year is closed', 400);
+            }
+
             $stmt = $pdo->prepare("
                 UPDATE vouchers SET
                     voucher_no = ?,
                     voucher_date = ?,
                     reference_no = ?,
+                    financial_year_id = ?,
+                    financial_year = ?,
                     party_ledger_id = ?,
                     billing_name = ?,
                     billing_address = ?,
@@ -1069,6 +1096,8 @@ try {
                 $voucherNo,
                 $input['voucher_date'],
                 $input['reference_no'] ?? null,
+                (int)$resolvedFy['id'],
+                $resolvedFy['code'],
                 $input['party_ledger_id'],
                 $billingName,
                 $billingAddress,
@@ -1310,6 +1339,10 @@ try {
 
         if ($voucher['status'] === 'cancelled') {
             ApiResponse::error('Invoice is already cancelled', 400);
+        }
+
+        if (FinancialYearHelper::isVoucherYearClosed($pdo, $id)) {
+            ApiResponse::error('Closed financial year vouchers cannot be cancelled', 400);
         }
 
         $pdo->beginTransaction();

@@ -15,6 +15,18 @@ const getApiBaseUrl = () => {
 const API_BASE_URL = getApiBaseUrl();
 
 const FINANCIAL_YEAR_STORAGE_KEY = 'selected_financial_year';
+const FINANCIAL_YEAR_ID_STORAGE_KEY = 'selected_financial_year_id';
+
+export interface FinancialYearOption {
+  id: number;
+  company_id?: number | null;
+  code: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_current?: number;
+  status?: 'open' | 'closed';
+}
 
 export interface FinancialYearRange {
   label: string;
@@ -47,6 +59,21 @@ export const setSelectedFinancialYearLabel = (label: string) => {
   localStorage.setItem(FINANCIAL_YEAR_STORAGE_KEY, label);
 };
 
+export const getSelectedFinancialYearId = (): number | null => {
+  const saved = localStorage.getItem(FINANCIAL_YEAR_ID_STORAGE_KEY);
+  if (!saved) return null;
+  const parsed = parseInt(saved, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+export const setSelectedFinancialYearId = (id: number | null) => {
+  if (id === null || !Number.isFinite(id)) {
+    localStorage.removeItem(FINANCIAL_YEAR_ID_STORAGE_KEY);
+    return;
+  }
+  localStorage.setItem(FINANCIAL_YEAR_ID_STORAGE_KEY, String(id));
+};
+
 export const getFinancialYearRangeByLabel = (label: string): FinancialYearRange | null => {
   const match = /^(\d{4})-(\d{2})$/.exec(label);
   if (!match) return null;
@@ -58,6 +85,7 @@ const shouldApplyFinancialYearFilter = (endpoint: string, method: string): boole
   if (method !== 'GET') return false;
   if (endpoint.includes('/auth/')) return false;
   if (endpoint.includes('/admin/')) return false;
+  if (endpoint.includes('/settings/financial_years.php')) return false;
   return true;
 };
 
@@ -66,16 +94,21 @@ const withFinancialYearParams = (endpoint: string, method: string): string => {
 
   const selectedFy = getSelectedFinancialYearLabel();
   const range = getFinancialYearRangeByLabel(selectedFy);
-  if (!range) return endpoint;
+  const selectedFyId = getSelectedFinancialYearId();
+  if (!range && !selectedFyId) return endpoint;
 
   const [path, queryString = ''] = endpoint.split('?');
   const params = new URLSearchParams(queryString);
 
+  if (selectedFyId && !params.has('financial_year_id')) {
+    params.set('financial_year_id', String(selectedFyId));
+  }
+
   if (!params.has('from_date')) {
-    params.set('from_date', range.startDate);
+    if (range) params.set('from_date', range.startDate);
   }
   if (!params.has('to_date')) {
-    params.set('to_date', range.endDate);
+    if (range) params.set('to_date', range.endDate);
   }
 
   const qs = params.toString();
@@ -890,6 +923,15 @@ export const vouchersApi = {
 };
 
 export const settingsApi = {
+  async getFinancialYears(): Promise<{ success: boolean; data: { financial_years: FinancialYearOption[] } }> {
+    return apiClient('/settings/financial_years.php');
+  },
+  async setCurrentFinancialYear(financialYearId: number): Promise<{ success: boolean; message: string; data?: { financial_year: FinancialYearOption } }> {
+    return apiClient('/settings/financial_years.php', {
+      method: 'PUT',
+      body: JSON.stringify({ financial_year_id: financialYearId }),
+    });
+  },
   async saveGstSettings(data: any): Promise<{ success: boolean; message: string }> {
     return apiClient('/gst/ewb_settings.php', {
       method: 'POST',
