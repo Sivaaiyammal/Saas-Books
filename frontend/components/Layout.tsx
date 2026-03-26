@@ -23,7 +23,8 @@ import {
   CreditCard,
   ShieldCheck,
   Building2,
-  Wallet
+  Wallet,
+  HardDrive
 } from 'lucide-react';
 import { authApi, FinancialYearOption, getSelectedFinancialYearId, getSelectedFinancialYearLabel, setSelectedFinancialYearId, setSelectedFinancialYearLabel, settingsApi } from '../services/api';
 
@@ -49,7 +50,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
   const [financialYears, setFinancialYears] = useState<FinancialYearOption[]>([]);
   const [selectedFinancialYearIdState, setSelectedFinancialYearIdState] = useState<number | null>(getSelectedFinancialYearId());
   const [selectedFinancialYear, setSelectedFinancialYear] = useState(getSelectedFinancialYearLabel());
-  const [openMenus, setOpenMenus] = useState<string[]>(['Masters', 'Vouchers']);
+  const [openMenus, setOpenMenus] = useState<string[]>(['Masters', 'Vouchers', 'Data']);
   const [user, setUser] = useState<any>(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
@@ -194,6 +195,18 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
     {
       section: 'Reporting', items: [
         { name: 'Reports', path: '/reports', icon: <BarChart3 size={18} /> },
+      ]
+    },
+    {
+      section: 'Data', items: [
+        {
+          name: 'Data',
+          icon: <HardDrive size={18} />,
+          children: [
+            { name: 'Backup & Restore', path: '/data/backup' },
+            { name: 'Split', path: '/data/split' },
+          ]
+        },
       ]
     },
     {

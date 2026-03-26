@@ -123,8 +123,28 @@ class FinancialYearHelper {
         }
     }
 
+    public static function backfillVouchers(PDO $pdo, ?int $companyId): void {
+        self::bootstrap($pdo);
+
+        // Assign financial_year_id to vouchers that are missing it, matching by code first, then by date range
+        $pdo->prepare("
+            UPDATE vouchers v
+            JOIN financial_years fy
+                ON fy.company_id <=> v.company_id
+                AND (
+                    (v.financial_year IS NOT NULL AND fy.code = v.financial_year)
+                    OR (v.financial_year IS NULL AND v.voucher_date BETWEEN fy.start_date AND fy.end_date)
+                )
+            SET v.financial_year_id = fy.id,
+                v.financial_year = COALESCE(v.financial_year, fy.code)
+            WHERE v.financial_year_id IS NULL
+              AND v.company_id <=> ?
+        ")->execute([$companyId]);
+    }
+
     public static function listYears(PDO $pdo, ?int $companyId): array {
         self::seedFromVouchers($pdo, $companyId);
+        self::backfillVouchers($pdo, $companyId);
 
         $stmt = $pdo->prepare("SELECT * FROM financial_years WHERE company_id <=> ? ORDER BY start_date DESC");
         $stmt->execute([$companyId]);

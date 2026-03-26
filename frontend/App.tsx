@@ -34,6 +34,8 @@ import DeliveryNoteVoucher from "./pages/DeliveryNoteVoucher";
 import DeliveryNoteRegister from "./pages/reports/DeliveryNoteRegister";
 import Profile from "./pages/Profile";
 import SaasAdminPanel from './pages/SaasAdminPanel';
+import DataBackup from './pages/data/DataBackup';
+import DataSplit from './pages/data/DataSplit';
 import { authApi, getAuthToken, clearTokens } from './services/api';
 
 type ModuleKey = 'sales_order' | 'purchase_order' | 'sales' | 'purchase' | 'payment' | 'receipt' | 'delivery_note' | 'quotation';
@@ -172,6 +174,9 @@ const App: React.FC = () => {
           <Route path="/reports/outstanding" element={<Outstanding />} />
           <Route path="/reports/movement" element={<MovementAnalysis />} />
           <Route path="/reports/summary" element={<StockSummary />} />
+          {/* Data */}
+          <Route path="/data/backup" element={<DataBackup />} />
+          <Route path="/data/split" element={<DataSplit />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" />} />
