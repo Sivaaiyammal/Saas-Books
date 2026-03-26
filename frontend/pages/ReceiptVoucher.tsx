@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Save,
   X,
@@ -43,8 +43,17 @@ interface OutstandingData {
   bill_count: number;
 }
 
+interface PrefilledBillAllocation {
+  invoice_no: string;
+  voucher_date: string;
+  allocated_amount: number;
+}
+
 const ReceiptVoucher: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const editVoucher = (location.state as { editVoucher?: any } | null)?.editVoucher;
+  const hasHydratedEditRef = useRef(false);
 
   // Master Data
   const [parties, setParties] = useState<any[]>([]);
@@ -58,6 +67,8 @@ const ReceiptVoucher: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingVoucherId, setEditingVoucherId] = useState<number | null>(null);
 
   const [partyId, setPartyId] = useState<number | ''>('');
   const [voucherDate, setVoucherDate] = useState(new Date().toISOString().split('T')[0]);
@@ -75,6 +86,9 @@ const ReceiptVoucher: React.FC = () => {
   const [useBillAdjustments, setUseBillAdjustments] = useState(false);
   const [isAllocationModalOpen, setIsAllocationModalOpen] = useState(false);
   const [billSearchTerm, setBillSearchTerm] = useState('');
+  const [receiptMode, setReceiptMode] = useState<'adjustable' | 'on_account' | 'advance'>('on_account');
+  const [prefilledBillAllocations, setPrefilledBillAllocations] = useState<Record<string, number>>({});
+  const [prefilledBillDetails, setPrefilledBillDetails] = useState<PrefilledBillAllocation[]>([]);
 
   // Computed: Selected Party details
   const selectedParty = useMemo(() => {
@@ -111,6 +125,88 @@ const ReceiptVoucher: React.FC = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (!editVoucher || isLoading || hasHydratedEditRef.current) {
+      return;
+    }
+
+    hasHydratedEditRef.current = true;
+    setIsEditing(true);
+    setEditingVoucherId(editVoucher.id ?? null);
+    setPartyId(editVoucher.party_ledger_id ? Number(editVoucher.party_ledger_id) : '');
+    setVoucherDate(editVoucher.voucher_date ? String(editVoucher.voucher_date).split('T')[0] : new Date().toISOString().split('T')[0]);
+    setReferenceNo(editVoucher.reference_no || '');
+    setNarration(editVoucher.narration || '');
+
+    const entries = Array.isArray(editVoucher.entries) ? editVoucher.entries : [];
+    const receivedEntry = entries.find((entry: any) => (
+      entry.dr_cr === 'Dr' && ['Cash-in-Hand', 'Bank Accounts'].includes(entry.group_name)
+    ));
+    const tdsEntry = entries.find((entry: any) => (
+      entry.dr_cr === 'Dr' && String(entry.description || '').toLowerCase().includes('tds')
+    ));
+
+    if (receivedEntry) {
+      setReceivedInId(Number(receivedEntry.ledger_id));
+      setAmount(String(parseFloat(receivedEntry.amount || '0')));
+    } else {
+      setReceivedInId(editVoucher.received_in ? Number(editVoucher.received_in) : '');
+      setAmount(String(parseFloat(editVoucher.amount_received || editVoucher.amount || editVoucher.total_amount || '0')));
+    }
+
+    if (tdsEntry) {
+      setHasTds(true);
+      setTdsAmount(String(parseFloat(tdsEntry.amount || '0')));
+      setTdsLedgerId(Number(tdsEntry.ledger_id));
+    } else {
+      setHasTds(false);
+      setTdsAmount('');
+      setTdsLedgerId('');
+    }
+
+    const billAdjustmentsFromEdit = Array.isArray(editVoucher.bill_adjustments) ? editVoucher.bill_adjustments : [];
+    const againstAdjustments = billAdjustmentsFromEdit.filter((adjustment: any) => (
+      String(adjustment.type || '').toLowerCase() === 'against' && adjustment.bill_no
+    ));
+
+    const hasAdvanceAdjustment = billAdjustmentsFromEdit.some((adjustment: any) => (
+      String(adjustment.type || '').toLowerCase() === 'advance'
+    ));
+
+    const existingAgainstBills = againstAdjustments.reduce((acc: Record<string, number>, adjustment: any) => {
+      acc[String(adjustment.bill_no)] = parseFloat(adjustment.amount || '0');
+      return acc;
+    }, {});
+
+    const existingAgainstBillDetails = againstAdjustments.map((adjustment: any) => ({
+      invoice_no: String(adjustment.bill_no || adjustment.original_bill_voucher_no || ''),
+      voucher_date: String(adjustment.bill_date || editVoucher.voucher_date || '').split('T')[0],
+      allocated_amount: parseFloat(adjustment.amount || '0'),
+    })).filter((adjustment: PrefilledBillAllocation) => adjustment.invoice_no);
+
+    setPrefilledBillAllocations(existingAgainstBills);
+    setPrefilledBillDetails(existingAgainstBillDetails);
+    const rawMode = String(editVoucher.receipt_mode || '').toLowerCase().replace(/\s+/g, '_');
+    const resolvedMode: 'adjustable' | 'on_account' | 'advance' = rawMode === 'adjustable'
+      ? 'adjustable'
+      : rawMode === 'advance'
+        ? 'advance'
+        : rawMode === 'on_account'
+          ? 'on_account'
+          : Object.keys(existingAgainstBills).length > 0
+            ? 'adjustable'
+            : hasAdvanceAdjustment
+              ? 'advance'
+              : 'on_account';
+
+    setReceiptMode(resolvedMode);
+    setUseBillAdjustments(resolvedMode === 'adjustable');
+  }, [editVoucher, isLoading]);
+
+  useEffect(() => {
+    setUseBillAdjustments(receiptMode === 'adjustable');
+  }, [receiptMode]);
+
   // Fetch Outstanding Bills when Party changes
   useEffect(() => {
     if (partyId) {
@@ -119,19 +215,49 @@ const ReceiptVoucher: React.FC = () => {
         try {
           const res = await vouchersApi.getOutstandingBills(Number(partyId));
           if (res.success && res.data) {
-            setOutstandingData(res.data);
-            // Map bills to pending invoices format for bill allocation
-            if (res.data.bills && res.data.bills.length > 0) {
-              setPendingInvoices(res.data.bills.map((bill: any) => ({
+            const salesBills = (res.data.bills || []).filter((bill: any) => bill.voucher_type === 'Sales');
+            const mappedInvoices = salesBills.map((bill: any) => {
+              const invoiceNo = bill.bill_no || bill.voucher_no;
+              const existingAllocatedAmount = prefilledBillAllocations[invoiceNo] || 0;
+              const availablePendingAmount = parseFloat(bill.pending_amount || '0') + existingAllocatedAmount;
+
+              return {
                 id: bill.allocation_id,
-                invoice_no: bill.bill_no || bill.voucher_no,
+                invoice_no: invoiceNo,
                 voucher_date: bill.bill_date || bill.voucher_date,
-                pending_amount: parseFloat(bill.pending_amount || '0'),
-                allocated_amount: 0,
-                selected: false,
+                pending_amount: availablePendingAmount,
+                allocated_amount: existingAllocatedAmount > 0 ? existingAllocatedAmount : 0,
+                selected: existingAllocatedAmount > 0,
                 voucher_type: bill.voucher_type,
                 voucher_id: bill.voucher_id
-              })));
+              };
+            });
+
+            const missingPrefilledInvoices = prefilledBillDetails
+              .filter((prefilledBill) => !mappedInvoices.some((invoice) => invoice.invoice_no === prefilledBill.invoice_no))
+              .map((prefilledBill, index) => ({
+                id: -(index + 1),
+                invoice_no: prefilledBill.invoice_no,
+                voucher_date: prefilledBill.voucher_date,
+                pending_amount: prefilledBill.allocated_amount,
+                allocated_amount: prefilledBill.allocated_amount,
+                selected: true,
+                voucher_type: 'Sales',
+                voucher_id: undefined,
+              }));
+
+            const combinedInvoices = [...mappedInvoices, ...missingPrefilledInvoices];
+            const adjustedOutstandingTotal = combinedInvoices.reduce((sum: number, bill) => sum + bill.pending_amount, 0);
+
+            setOutstandingData({
+              ...res.data,
+              bills: combinedInvoices,
+              total_outstanding: adjustedOutstandingTotal,
+              bill_count: combinedInvoices.length,
+            });
+            // Map bills to pending invoices format for bill allocation
+            if (combinedInvoices.length > 0) {
+              setPendingInvoices(combinedInvoices);
             } else {
               setPendingInvoices([]);
             }
@@ -152,7 +278,7 @@ const ReceiptVoucher: React.FC = () => {
       setOutstandingData(null);
       setPendingInvoices([]);
     }
-  }, [partyId]);
+  }, [partyId, prefilledBillAllocations, prefilledBillDetails]);
 
   const allocatedTotal = useMemo(() => {
     return pendingInvoices.filter(i => i.selected).reduce((acc, i) => acc + i.allocated_amount, 0);
@@ -165,11 +291,17 @@ const ReceiptVoucher: React.FC = () => {
       return;
     }
 
+    if (receiptMode === 'adjustable' && !pendingInvoices.some(i => i.selected && i.allocated_amount > 0)) {
+      alert("Select at least one bill and allocation amount in Adjustable mode.");
+      return;
+    }
+
     const payload: any = {
       party_ledger_id: Number(partyId),
       voucher_date: voucherDate,
       amount: numericAmount,
       received_in: Number(receivedInId),
+      receipt_mode: receiptMode,
       reference_no: referenceNo || undefined,
       narration: narration || undefined,
     };
@@ -179,20 +311,23 @@ const ReceiptVoucher: React.FC = () => {
       payload.tds_ledger_id = Number(tdsLedgerId);
     }
 
-    if (useBillAdjustments && pendingInvoices.some(i => i.selected)) {
+    if (receiptMode === 'adjustable' && pendingInvoices.some(i => i.selected)) {
       payload.bill_adjustments = pendingInvoices
         .filter(i => i.selected)
         .map(i => ({
           allocation_id: i.id,
+          bill_no: i.invoice_no,
           amount: i.allocated_amount
         }));
     }
 
     setIsSaving(true);
     try {
-      const res = await vouchersApi.createReceipt(payload);
+      const res = isEditing && editingVoucherId
+        ? await vouchersApi.updateReceipt(editingVoucherId, payload)
+        : await vouchersApi.createReceipt(payload);
       if (res.success) {
-        alert("Receipt saved successfully!");
+        alert(isEditing ? "Receipt updated successfully!" : "Receipt saved successfully!");
         navigate('/reports/receivables');
       } else {
         alert(res.message || "Failed to save receipt.");
@@ -226,9 +361,16 @@ const ReceiptVoucher: React.FC = () => {
             <Receipt size={32} />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none uppercase">Receipt (Post Collection)</h1>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none uppercase">
+              {isEditing ? 'Edit Receipt Voucher' : 'Receipt (Post Collection)'}
+            </h1>
             <div className="flex items-center gap-2 mt-3">
               <span className="px-3 py-1 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-lg shadow-emerald-200">Financial Inward</span>
+              {isEditing && editingVoucherId && (
+                <span className="px-3 py-1 bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-widest rounded-lg border border-amber-200">
+                  Editing #{editingVoucherId}
+                </span>
+              )}
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 ml-2">
                  <ShieldCheck size={12} className="text-indigo-500" /> Audit Compliant Entry
               </span>
@@ -366,6 +508,28 @@ const ReceiptVoucher: React.FC = () => {
 
           {/* Allocation Strategy Card */}
           <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-xl shadow-slate-200/40 space-y-6 overflow-hidden relative">
+             <div className="flex flex-wrap items-center gap-3 pb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Receipt Type</span>
+                <button
+                  onClick={() => setReceiptMode('adjustable')}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${receiptMode === 'adjustable' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-200 hover:text-indigo-600'}`}
+                >
+                  Adjustable
+                </button>
+                <button
+                  onClick={() => setReceiptMode('on_account')}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${receiptMode === 'on_account' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-700'}`}
+                >
+                  On Account
+                </button>
+                <button
+                  onClick={() => setReceiptMode('advance')}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${receiptMode === 'advance' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-200 hover:text-emerald-600'}`}
+                >
+                  Advance
+                </button>
+             </div>
+
              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
@@ -376,15 +540,20 @@ const ReceiptVoucher: React.FC = () => {
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Map funds to specific invoices</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setUseBillAdjustments(!useBillAdjustments)}
-                  className={`w-12 h-7 rounded-full transition-all relative ${useBillAdjustments ? 'bg-indigo-600' : 'bg-slate-200'}`}
-                >
-                  <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all ${useBillAdjustments ? 'right-1' : 'left-1'}`} />
-                </button>
+                <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border bg-slate-50 text-slate-500 border-slate-200">
+                  {receiptMode === 'adjustable' ? 'Adjustable' : receiptMode === 'advance' ? 'Advance' : 'On Account'}
+                </span>
              </div>
 
-             {useBillAdjustments ? (
+               {receiptMode === 'advance' ? (
+                 <div className="p-8 bg-emerald-50/50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-emerald-700 flex items-center justify-center gap-3 border border-emerald-100">
+                   <Zap size={14} className="text-emerald-500" /> Advance mode selected. Bill mapping is disabled.
+                 </div>
+               ) : receiptMode === 'on_account' ? (
+                <div className="p-8 bg-slate-50/50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center justify-center gap-3 border border-slate-100">
+                   <Zap size={14} className="text-slate-400" /> On Account mode selected. Amount will post to On Account.
+                </div>
+             ) : (
                 <div className="animate-in fade-in slide-in-from-top-4 duration-500 pt-4">
                    {isFetchingOutstanding ? (
                       <div className="py-12 flex flex-col items-center gap-3">
@@ -434,10 +603,6 @@ const ReceiptVoucher: React.FC = () => {
                          <p className="text-xs font-bold text-slate-500 leading-relaxed px-10">We couldn't find any pending invoices associated with this ledger.<br/><span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Entry will be processed as 'On Account'</span></p>
                       </div>
                    )}
-                </div>
-             ) : (
-                <div className="p-8 bg-slate-50/50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center justify-center gap-3 border border-slate-100">
-                   <Zap size={14} className="text-indigo-400" /> Automatic "On Account" Ledger Posting Mode
                 </div>
              )}
           </div>

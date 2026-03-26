@@ -39,6 +39,7 @@ interface ReceiptInvoice {
   id: number;
   voucher_no: string;
   voucher_date: string;
+  receipt_mode?: string;
   party_name: string;
   party_ledger_id: number;
   amount: string;
@@ -343,6 +344,7 @@ const ReceiptRegister: React.FC = () => {
               <tr>
                 <th className="px-8 py-8 w-[140px]">Date</th>
                 <th className="px-4 py-8 w-[160px]">Voucher No</th>
+                <th className="px-4 py-8 w-[140px] text-center">Type</th>
                 <th className="px-4 py-8 w-[240px]">Received From</th>
                 {/* <th className="px-4 py-8 w-[200px]">Deposited In</th> */}
                 <th className="px-4 py-8 w-[170px] text-right">Amount</th>
@@ -352,9 +354,9 @@ const ReceiptRegister: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {isLoading ? (
-                <tr><td colSpan={7} className="py-40 text-center"><div className="flex flex-col items-center gap-4"><Loader2 className="animate-spin text-indigo-600" size={48} /><p className="text-xs font-black text-slate-400 uppercase tracking-widest">Loading...</p></div></td></tr>
+                <tr><td colSpan={8} className="py-40 text-center"><div className="flex flex-col items-center gap-4"><Loader2 className="animate-spin text-indigo-600" size={48} /><p className="text-xs font-black text-slate-400 uppercase tracking-widest">Loading...</p></div></td></tr>
               ) : filteredData.length === 0 ? (
-                <tr><td colSpan={7} className="py-40 text-center"><div className="flex flex-col items-center gap-4 text-slate-300"><Search size={64} /><p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No matching records found.</p></div></td></tr>
+                <tr><td colSpan={8} className="py-40 text-center"><div className="flex flex-col items-center gap-4 text-slate-300"><Search size={64} /><p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No matching records found.</p></div></td></tr>
               ) : filteredData.map((receipt) => {
                 const isMenuOpen = openMenuId === receipt.id;
                 return (
@@ -363,6 +365,11 @@ const ReceiptRegister: React.FC = () => {
                       <span className="text-[11px] font-black text-slate-900 tracking-tight">{new Date(receipt.voucher_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                     </td>
                     <td className="px-4 py-6"><span className="px-3 py-1.5 bg-indigo-50 text-indigo-600 text-[11px] font-black tracking-widest rounded-lg border border-indigo-100 uppercase">{receipt.voucher_no}</span></td>
+                    <td className="px-4 py-6 text-center">
+                      <span className="px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full border bg-slate-50 text-slate-700 border-slate-200">
+                        {receipt.receipt_mode || 'On Account'}
+                      </span>
+                    </td>
                     <td className="px-4 py-6">
                       <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 font-black group-hover:bg-indigo-600 group-hover:text-white transition-all uppercase">{(receipt.party_name || 'U')[0]}</div>
@@ -442,7 +449,7 @@ const ReceiptRegister: React.FC = () => {
                 <>
                   <div className="bg-indigo-50 border border-indigo-100 rounded-[2.5rem] p-8 flex items-center justify-between">
                     <div><p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">Receipt Date</p><p className="text-xl font-black text-indigo-900">{selectedVoucher.voucher_date}</p></div>
-                    <div className="text-right"><p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">Voucher ID</p><p className="text-xl font-black text-indigo-900 uppercase">{selectedVoucher.voucher_no}</p></div>
+                    <div className="text-right"><p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">Voucher ID</p><p className="text-xl font-black text-indigo-900 uppercase">{selectedVoucher.voucher_no}</p><p className="text-[10px] font-black text-slate-500 uppercase mt-2">Type: {selectedVoucher.receipt_mode || 'On Account'}</p></div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

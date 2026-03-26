@@ -388,12 +388,14 @@ interface ReceiptRequest {
   voucher_date: string;
   amount: number;
   received_in: number;
+  receipt_mode?: 'adjustable' | 'on_account' | 'advance';
   reference_no?: string;
   narration?: string;
   tds_amount?: number;
   tds_ledger_id?: number;
   bill_adjustments?: {
     allocation_id: number;
+    bill_no?: string;
     amount: number;
   }[];
 }
@@ -403,12 +405,14 @@ interface PaymentRequest {
   voucher_date: string;
   amount: number;
   paid_from: number;
+  payment_mode?: 'adjustable' | 'on_account' | 'advance';
   reference_no?: string;
   narration?: string;
   tds_amount?: number;
   tds_ledger_id?: number;
   bill_adjustments?: {
     allocation_id: number;
+    bill_no?: string;
     amount: number;
   }[];
 }
@@ -778,6 +782,12 @@ export const vouchersApi = {
   async getReceipt(id: number): Promise<{ success: boolean; data: any }> {
     return apiClient(`/vouchers/receipt.php?id=${id}`);
   },
+  async updateReceipt(id: number, data: ReceiptRequest): Promise<{ success: boolean; message: string; data?: any }> {
+    return apiClient(`/vouchers/receipt.php?id=${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ id, ...data }),
+    });
+  },
   async deleteReceipt(id: number): Promise<{ success: boolean; message: string }> {
     return apiClient('/vouchers/receipt.php', {
       method: 'DELETE',
@@ -794,6 +804,18 @@ export const vouchersApi = {
   },
   async getPayments(): Promise<{ success: boolean; data: { payments: any[] } }> {
     return apiClient('/vouchers/payment.php');
+  },
+  async getPaymentOutstandingBills(vendorId: number): Promise<{
+    success: boolean;
+    message?: string;
+    data: {
+      bills: any[];
+      total_outstanding: number;
+      bill_count?: number;
+      vendor_id?: number;
+    }
+  }> {
+    return apiClient(`/vouchers/payment.php?outstanding_for=${vendorId}`);
   },
   async getPayment(id: number): Promise<{ success: boolean; data: any }> {
     return apiClient(`/vouchers/payment.php?id=${id}`);

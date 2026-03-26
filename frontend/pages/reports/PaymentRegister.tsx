@@ -39,6 +39,7 @@ interface PaymentInvoice {
   id: number;
   voucher_no: string;
   voucher_date: string;
+  payment_mode?: string;
   party_name: string;
   party_ledger_id: number;
   amount: string;
@@ -346,7 +347,7 @@ const PaymentRegister: React.FC = () => {
                 <th className="px-4 py-8 w-[240px]">Payment To</th>
                 {/* <th className="px-4 py-8 w-[180px]">Source Account</th> */}
                 <th className="px-4 py-8 w-[170px] text-right">Debit Value</th>
-                <th className="px-4 py-8 w-[130px] text-center">Type</th>
+                <th className="px-4 py-8 w-[130px] text-center">Mode</th>
                 <th className="px-8 py-8 w-[80px] text-right">Actions</th>
               </tr>
             </thead>
@@ -381,7 +382,7 @@ const PaymentRegister: React.FC = () => {
                     <td className="px-4 py-6 text-right"><span className="text-sm font-black text-rose-600">₹{parseFloat(payment.total_amount || '0').toLocaleString()}</span></td>
                     <td className="px-4 py-6 text-center">
                       <span className="px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full border bg-slate-50 text-slate-500 border-slate-200">
-                        {(payment.paid_from_name || '').toLowerCase().includes('cash') ? 'Cash' : 'Bank'}
+                        {payment.payment_mode || 'On Account'}
                       </span>
                     </td>
                     {/* <td className="px-8 py-6 text-right relative" onClick={(e) => e.stopPropagation()}>
@@ -446,7 +447,7 @@ const PaymentRegister: React.FC = () => {
                 <>
                   <div className="bg-rose-50 border border-rose-100 rounded-[2.5rem] p-8 flex items-center justify-between">
                     <div><p className="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em] mb-1">Effective Date</p><p className="text-xl font-black text-rose-900">{selectedVoucher.voucher_date}</p></div>
-                    <div className="text-right"><p className="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em] mb-1">Voucher ID</p><p className="text-xl font-black text-rose-900 uppercase">{selectedVoucher.voucher_no}</p></div>
+                    <div className="text-right"><p className="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em] mb-1">Voucher ID</p><p className="text-xl font-black text-rose-900 uppercase">{selectedVoucher.voucher_no}</p><p className="text-[10px] font-black text-slate-500 uppercase mt-2">Mode: {selectedVoucher.payment_mode || 'On Account'}</p></div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

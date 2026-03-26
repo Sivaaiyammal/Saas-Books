@@ -42,6 +42,24 @@ try {
     $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
+    // Ensure payment_mode column exists for classifying payment behavior.
+    $hasPaymentModeColumnStmt = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'vouchers' AND COLUMN_NAME = 'payment_mode'");
+    $hasPaymentModeColumnStmt->execute();
+    if ((int)$hasPaymentModeColumnStmt->fetchColumn() === 0) {
+        $pdo->exec("ALTER TABLE vouchers ADD COLUMN payment_mode ENUM('Adjustable','On Account','Advance') NULL AFTER receipt_mode");
+    }
+
+    $normalizePaymentMode = function ($mode) {
+        $raw = strtolower(trim((string)$mode));
+        if ($raw === 'adjustable') {
+            return 'Adjustable';
+        }
+        if ($raw === 'advance') {
+            return 'Advance';
+        }
+        return 'On Account';
+    };
+
     // GET: List payments or get single or get outstanding bills
     if ($method === 'GET') {
         // Get outstanding bills for a vendor
@@ -66,9 +84,11 @@ try {
                 AND ba.type = 'New'
                 AND ba.pending_amount > 0
                 AND v.status = 'posted'
+                AND v.voucher_type = 'Purchase'
+                AND v.company_id = ?
                 ORDER BY ba.bill_date ASC
             ");
-            $stmt->execute([$vendorId]);
+            $stmt->execute([$vendorId, $companyId]);
             $bills = $stmt->fetchAll();
 
             $totalOutstanding = array_sum(array_column($bills, 'pending_amount'));
@@ -125,6 +145,17 @@ try {
             ");
             $stmt->execute([$id]);
             $voucher['bill_adjustments'] = $stmt->fetchAll();
+
+            if (empty($voucher['payment_mode'])) {
+                $hasAgainst = false;
+                foreach ($voucher['bill_adjustments'] as $adjustment) {
+                    if (strtolower((string)($adjustment['type'] ?? '')) === 'against') {
+                        $hasAgainst = true;
+                        break;
+                    }
+                }
+                $voucher['payment_mode'] = $hasAgainst ? 'Adjustable' : 'On Account';
+            }
 
             ApiResponse::success($voucher, 'Payment retrieved successfully');
         }
@@ -188,7 +219,19 @@ try {
         // Get payments
         $stmt = $pdo->prepare("
             SELECT v.*,
-                   l.name as party_name
+                   l.name as party_name,
+                   COALESCE(
+                       v.payment_mode,
+                       CASE
+                           WHEN EXISTS(
+                               SELECT 1
+                               FROM bill_allocations ba2
+                               INNER JOIN voucher_entries ve2 ON ba2.voucher_entry_id = ve2.id
+                               WHERE ve2.voucher_id = v.id AND ba2.type = 'Against'
+                           ) THEN 'Adjustable'
+                           ELSE 'On Account'
+                       END
+                   ) as payment_mode
             FROM vouchers v
             LEFT JOIN ledgers l ON v.party_ledger_id = l.id
             WHERE $whereClause
@@ -235,18 +278,22 @@ try {
             ApiResponse::validationError($errors);
         }
 
-        // Validate vendor ledger (Sundry Creditor)
+        // Validate party ledger (Sundry Creditor or Sundry Debtor)
         $stmt = $pdo->prepare("
             SELECT l.id, l.name, g.name as group_name
             FROM ledgers l
             INNER JOIN `groups` g ON l.group_id = g.id
-            WHERE l.id = ? AND (g.name = 'Sundry Creditors' OR g.name LIKE 'Sundry Creditors%')
+            WHERE l.id = ?
+            AND (
+                g.name = 'Sundry Creditors' OR g.name LIKE 'Sundry Creditors%'
+                OR g.name = 'Sundry Debtors' OR g.name LIKE 'Sundry Debtors%'
+            )
         ");
         $stmt->execute([$input['party_ledger_id']]);
         $partyLedger = $stmt->fetch();
 
         if (!$partyLedger) {
-            ApiResponse::validationError(['party_ledger_id' => ['Invalid vendor ledger (must be Sundry Creditor)']]);
+            ApiResponse::validationError(['party_ledger_id' => ['Invalid ledger (must be Sundry Creditor or Sundry Debtor)']]);
         }
 
         // Validate paid_from ledger (Cash or Bank)
@@ -267,7 +314,16 @@ try {
         $tdsAmount = isset($input['tds_amount']) ? (float)$input['tds_amount'] : 0;
         $discountAmount = isset($input['discount_amount']) ? (float)$input['discount_amount'] : 0;
         $voucherDate = $input['voucher_date'] ?? date('Y-m-d');
+        $paymentMode = $normalizePaymentMode($input['payment_mode'] ?? 'on_account');
         $billAdjustments = $input['bill_adjustments'] ?? [];
+
+        if ($paymentMode === 'Adjustable' && empty($billAdjustments)) {
+            ApiResponse::validationError(['bill_adjustments' => ['Select at least one bill in Adjustable mode']]);
+        }
+
+        if (($paymentMode === 'On Account' || $paymentMode === 'Advance') && !empty($billAdjustments)) {
+            ApiResponse::validationError(['bill_adjustments' => ['Bill adjustments are allowed only in Adjustable mode']]);
+        }
 
         // Total settlement = amount paid + TDS deducted + discount received
         $totalSettled = $amount + $tdsAmount + $discountAmount;
@@ -308,9 +364,13 @@ try {
                     FROM bill_allocations ba
                     INNER JOIN voucher_entries ve ON ba.voucher_entry_id = ve.id
                     INNER JOIN vouchers v ON ve.voucher_id = v.id
-                    WHERE ba.id = ? AND ba.ledger_id = ? AND ba.type = 'New'
+                    WHERE ba.id = ?
+                    AND ba.ledger_id = ?
+                    AND ba.type = 'New'
+                    AND v.voucher_type = 'Purchase'
+                    AND v.company_id = ?
                 ");
-                $stmt->execute([$adj['allocation_id'], $input['party_ledger_id']]);
+                $stmt->execute([$adj['allocation_id'], $input['party_ledger_id'], $companyId]);
                 $allocation = $stmt->fetch();
 
                 if (!$allocation) {
@@ -327,25 +387,27 @@ try {
 
         try {
             // Generate voucher number
-            $voucherNo = VoucherHelper::generateVoucherNo($pdo, 'Payment');
+            $voucherNo = VoucherHelper::generateVoucherNo($pdo, 'Payment', $companyId, 1);
 
             // Create voucher
             $stmt = $pdo->prepare("
                 INSERT INTO vouchers (
-                    voucher_type, voucher_no, voucher_date,
+                    company_id, voucher_type, voucher_no, voucher_date,
                     party_ledger_id, total_amount,
-                    reference_no, narration, status, created_by
+                    reference_no, narration, payment_mode, status, created_by
                 ) VALUES (
-                    'Payment', ?, ?, ?, ?, ?, ?, 'posted', ?
+                    ?, 'Payment', ?, ?, ?, ?, ?, ?, ?, 'posted', ?
                 )
             ");
             $stmt->execute([
+                $companyId,
                 $voucherNo,
                 $voucherDate,
                 $input['party_ledger_id'],
                 $totalSettled,
                 $input['reference_no'] ?? null,
                 $input['narration'] ?? null,
+                $paymentMode,
                 $user['id']
             ]);
             $voucherId = $pdo->lastInsertId();
@@ -446,6 +508,7 @@ try {
                 'discount_amount' => round($discountAmount, 2),
                 'total_settled' => round($totalSettled, 2),
                 'bills_adjusted' => count($billAdjustments),
+                'payment_mode' => $paymentMode,
                 'status' => 'posted'
             ];
 

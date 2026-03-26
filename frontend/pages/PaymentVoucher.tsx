@@ -66,6 +66,7 @@ const PaymentVoucher: React.FC = () => {
   const [useBillAdjustments, setUseBillAdjustments] = useState(false);
   const [isAllocationModalOpen, setIsAllocationModalOpen] = useState(false);
   const [isFetchingBills, setIsFetchingBills] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<'adjustable' | 'on_account' | 'advance'>('on_account');
 
   // Computed: Selected Party details
   const selectedParty = useMemo(() => {
@@ -77,14 +78,20 @@ const PaymentVoucher: React.FC = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [suppliersRes, bankRes, cashRes, tdsRes] = await Promise.all([
-          mastersApi.getLedgersByGroup(3), // Suppliers (Sundry Creditors)
+        const [creditorsRes, debtorsRes, bankRes, cashRes, tdsRes] = await Promise.all([
+          mastersApi.getLedgersByGroup(3), // Sundry Creditors
+          mastersApi.getLedgersByGroup(2), // Sundry Debtors
           mastersApi.getLedgersByGroup(4), // Bank Accounts
           mastersApi.getLedgersByGroup(5), // Cash Accounts
           mastersApi.getLedgersByGroup(8)  // TDS Ledgers
         ]);
 
-        if (suppliersRes.success) setParties(suppliersRes.data.ledgers);
+        const combinedParties = [
+          ...(creditorsRes.success ? creditorsRes.data.ledgers : []),
+          ...(debtorsRes.success ? debtorsRes.data.ledgers : []),
+        ];
+        const uniqueParties = Array.from(new Map(combinedParties.map((ledger: any) => [ledger.id, ledger])).values());
+        setParties(uniqueParties);
 
         // Merge bank and cash for Paid From
         const combined = [
@@ -110,11 +117,12 @@ const PaymentVoucher: React.FC = () => {
       const fetchVendorStats = async () => {
         setIsFetchingBills(true);
         try {
-          const res = await vouchersApi.getOutstandingBills(Number(partyId));
+          const res = await vouchersApi.getPaymentOutstandingBills(Number(partyId));
           if (res.success && res.data) {
+            const billCount = 'bill_count' in res.data ? Number((res.data as any).bill_count || 0) : 0;
             setVendorOutstanding({
                total: res.data.total_outstanding || 0,
-               count: res.data.bill_count || 0
+              count: billCount
             });
 
             if (res.data.bills && res.data.bills.length > 0) {
@@ -144,6 +152,10 @@ const PaymentVoucher: React.FC = () => {
     }
   }, [partyId]);
 
+  useEffect(() => {
+    setUseBillAdjustments(paymentMode === 'adjustable');
+  }, [paymentMode]);
+
   const allocatedTotal = useMemo(() => {
     return pendingInvoices.filter(i => i.selected).reduce((acc, i) => acc + i.allocated_amount, 0);
   }, [pendingInvoices]);
@@ -155,11 +167,17 @@ const PaymentVoucher: React.FC = () => {
       return;
     }
 
+    if (paymentMode === 'adjustable' && !pendingInvoices.some(i => i.selected && i.allocated_amount > 0)) {
+      alert("Select at least one bill and allocation amount in Adjustable mode.");
+      return;
+    }
+
     const payload: any = {
       party_ledger_id: Number(partyId),
       voucher_date: voucherDate,
       amount: numericAmount,
       paid_from: Number(paidFromId),
+      payment_mode: paymentMode,
       reference_no: referenceNo || undefined,
       narration: narration || undefined,
     };
@@ -169,11 +187,12 @@ const PaymentVoucher: React.FC = () => {
       payload.tds_ledger_id = Number(tdsLedgerId);
     }
 
-    if (useBillAdjustments && pendingInvoices.some(i => i.selected)) {
+    if (paymentMode === 'adjustable' && pendingInvoices.some(i => i.selected)) {
       payload.bill_adjustments = pendingInvoices
         .filter(i => i.selected)
         .map(i => ({
           allocation_id: i.id,
+          bill_no: i.invoice_no,
           amount: i.allocated_amount
         }));
     }
@@ -262,7 +281,7 @@ const PaymentVoucher: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               {/* Vendor Selection */}
               <div className="space-y-3">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Paid To (Vendor/Supplier)</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Paid To (Debtor/Creditor)</label>
                 <div className="relative group">
                   <Building2 className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-indigo-600 transition-colors" size={18} />
                   <select
@@ -270,7 +289,7 @@ const PaymentVoucher: React.FC = () => {
                     onChange={(e) => setPartyId(e.target.value ? Number(e.target.value) : '')}
                     className="w-full pl-14 pr-10 py-4 bg-slate-50/50 border border-slate-200 rounded-[1.5rem] text-sm font-bold focus:ring-8 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none appearance-none transition-all shadow-inner"
                   >
-                    <option value="">Search Supplier...</option>
+                    <option value="">Search Ledger...</option>
                     {parties.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                   <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
@@ -348,6 +367,28 @@ const PaymentVoucher: React.FC = () => {
 
           {/* Allocation Strategy Card */}
           <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-xl shadow-slate-200/40 space-y-6 overflow-hidden relative">
+             <div className="flex flex-wrap items-center gap-3 pb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Payment Type</span>
+                <button
+                  onClick={() => setPaymentMode('adjustable')}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${paymentMode === 'adjustable' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-200 hover:text-indigo-600'}`}
+                >
+                  Adjustable
+                </button>
+                <button
+                  onClick={() => setPaymentMode('on_account')}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${paymentMode === 'on_account' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400 hover:text-slate-700'}`}
+                >
+                  On Account
+                </button>
+                <button
+                  onClick={() => setPaymentMode('advance')}
+                  className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${paymentMode === 'advance' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-200 hover:text-emerald-600'}`}
+                >
+                  Advance
+                </button>
+             </div>
+
              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
@@ -358,15 +399,20 @@ const PaymentVoucher: React.FC = () => {
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">Settle specific purchase invoices</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setUseBillAdjustments(!useBillAdjustments)}
-                  className={`w-12 h-7 rounded-full transition-all relative ${useBillAdjustments ? 'bg-indigo-600' : 'bg-slate-200'}`}
-                >
-                  <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all ${useBillAdjustments ? 'right-1' : 'left-1'}`} />
-                </button>
+                   <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border bg-slate-50 text-slate-500 border-slate-200">
+                    {paymentMode === 'adjustable' ? 'Adjustable' : paymentMode === 'advance' ? 'Advance' : 'On Account'}
+                   </span>
              </div>
 
-             {useBillAdjustments ? (
+                 {paymentMode === 'advance' ? (
+                   <div className="p-8 bg-emerald-50/50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-emerald-700 flex items-center justify-center gap-3 border border-emerald-100">
+                     <Zap size={14} className="text-emerald-500" /> Advance mode selected. Bill mapping is disabled.
+                   </div>
+                 ) : paymentMode === 'on_account' ? (
+                   <div className="p-8 bg-slate-50/50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center justify-center gap-3 border border-slate-100">
+                     <Zap size={14} className="text-indigo-400" /> On Account mode selected. Amount will post to On Account.
+                   </div>
+                 ) : (
                 <div className="animate-in fade-in slide-in-from-top-4 duration-500 pt-4">
                    {isFetchingBills ? (
                       <div className="py-12 flex flex-col items-center gap-3">
@@ -416,10 +462,6 @@ const PaymentVoucher: React.FC = () => {
                          <p className="text-xs font-bold text-slate-500 leading-relaxed px-10">We couldn't find any pending purchase invoices for this vendor.<br/><span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Voucher will be posted as 'On Account'</span></p>
                       </div>
                    )}
-                </div>
-             ) : (
-                <div className="p-8 bg-slate-50/50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center justify-center gap-3 border border-slate-100">
-                   <Zap size={14} className="text-indigo-400" /> Standard "On Account" Outflow Posting Mode
                 </div>
              )}
           </div>
