@@ -10,13 +10,15 @@ class VoucherHelper {
      * @param int $startingNumber Starting number if no vouchers exist (default: 1)
      * @return string Generated voucher number
      */
-    public static function generateVoucherNo($pdo, $voucherType, $companyId = null, $startingNumber = 1) {
+    public static function generateVoucherNo($pdo, $voucherType, $companyId = null, $startingNumber = 1, $voucherDate = null) {
         $prefix = self::getVoucherPrefix($voucherType);
+        [$fyStart, $fyEnd] = self::getFinancialYearRange($voucherDate);
 
         $sql = "SELECT voucher_no FROM vouchers
                 WHERE voucher_type = ?
-                AND voucher_no LIKE ?";
-        $params = [$voucherType, $prefix . '%'];
+                AND voucher_no LIKE ?
+                AND voucher_date BETWEEN ? AND ?";
+        $params = [$voucherType, $prefix . '%', $fyStart, $fyEnd];
 
         if ($companyId) {
             $sql .= " AND company_id = ?";
@@ -30,8 +32,9 @@ class VoucherHelper {
         $lastVoucher = $stmt->fetch();
 
         if ($lastVoucher) {
-            // Extract number from last voucher (e.g., INV-123 => 123)
-            $lastNumber = (int)preg_replace('/[^0-9]/', '', $lastVoucher['voucher_no']);
+            // Extract trailing number from last voucher (e.g., INV-123 => 123)
+            preg_match('/(\d+)$/', (string)$lastVoucher['voucher_no'], $matches);
+            $lastNumber = isset($matches[1]) ? (int)$matches[1] : 0;
             $nextNumber = $lastNumber + 1;
         } else {
             // Use starting number if no vouchers exist
@@ -53,12 +56,71 @@ class VoucherHelper {
             'Payment' => 'PAY-',
             'Sales Order' => 'SO-',
             'Purchase Order' => 'PO-',
+            'Delivery Note' => 'DN-',
             'Quotation' => 'VCH-',
             'Contra' => 'CON-',
             'Journal' => 'JV-'
         ];
 
         return $prefixes[$voucherType] ?? 'VCH-';
+    }
+
+    /**
+     * Generate next order number for orders table (Sales Order / Purchase Order)
+     */
+    public static function generateOrderNo($pdo, $orderType, $companyId = null, $startingNumber = 1, $orderDate = null) {
+        $voucherType = $orderType === 'Purchase' ? 'Purchase Order' : 'Sales Order';
+        $prefix = self::getVoucherPrefix($voucherType);
+        [$fyStart, $fyEnd] = self::getFinancialYearRange($orderDate);
+
+        $sql = "SELECT order_no FROM orders
+                WHERE order_type = ?
+                AND order_no LIKE ?
+                AND order_date BETWEEN ? AND ?";
+        $params = [$orderType, $prefix . '%', $fyStart, $fyEnd];
+
+        if ($companyId) {
+            $sql .= " AND company_id = ?";
+            $params[] = $companyId;
+        }
+
+        $sql .= " ORDER BY id DESC LIMIT 1";
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $lastOrder = $stmt->fetch();
+
+        if ($lastOrder) {
+            preg_match('/(\d+)$/', (string)$lastOrder['order_no'], $matches);
+            $lastNumber = isset($matches[1]) ? (int)$matches[1] : 0;
+            $nextNumber = $lastNumber + 1;
+        } else {
+            $nextNumber = $startingNumber;
+        }
+
+        return $prefix . $nextNumber;
+    }
+
+    /**
+     * Financial year range for India FY (April 1 - March 31)
+     */
+    public static function getFinancialYearRange($date = null) {
+        $dateObj = $date ? new \DateTime($date) : new \DateTime();
+        $year = (int)$dateObj->format('Y');
+        $month = (int)$dateObj->format('n');
+
+        if ($month >= 4) {
+            $startYear = $year;
+            $endYear = $year + 1;
+        } else {
+            $startYear = $year - 1;
+            $endYear = $year;
+        }
+
+        return [
+            sprintf('%d-04-01', $startYear),
+            sprintf('%d-03-31', $endYear),
+        ];
     }
 
     /**

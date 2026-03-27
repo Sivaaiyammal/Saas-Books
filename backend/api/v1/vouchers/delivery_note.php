@@ -209,10 +209,13 @@ try {
 
         try {
             // Generate voucher number
-            $prefix    = 'DN';
-            $stmt      = $pdo->query("SELECT MAX(id) FROM vouchers WHERE voucher_type = 'Delivery Note'");
-            $maxId     = $stmt->fetchColumn() ?? 0;
-            $voucherNo = $input['voucher_no'] ?? ($prefix . '-' . str_pad($maxId + 1, 6, '0', STR_PAD_LEFT));
+            $voucherNo = $input['voucher_no'] ?? VoucherHelper::generateVoucherNo(
+                $pdo,
+                'Delivery Note',
+                $companyId,
+                1,
+                $input['voucher_date'] ?? null
+            );
 
             // Calculate totals (no tax — DN is just a physical document)
             $totalQty    = 0;

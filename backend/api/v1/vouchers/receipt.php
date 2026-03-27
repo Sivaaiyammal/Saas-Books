@@ -81,9 +81,9 @@ try {
             INNER JOIN vouchers v ON ve.voucher_id = v.id
             WHERE ba.ledger_id = ?
             AND ba.pending_amount > 0
-            AND ba.type = 'New'
+            AND ba.type IN ('New', 'Opening')
             AND v.status = 'posted'
-            AND v.voucher_type = 'Sales'
+            AND (v.voucher_type = 'Sales' OR ba.type = 'Opening')
             AND v.company_id = ?
             ORDER BY ba.bill_date ASC
         ");
@@ -350,9 +350,9 @@ try {
                     INNER JOIN vouchers v ON ve.voucher_id = v.id
                     WHERE ba.id = ?
                     AND ba.ledger_id = ?
-                    AND ba.type = 'New'
+                    AND ba.type IN ('New', 'Opening')
                     AND v.status = 'posted'
-                    AND v.voucher_type = 'Sales'
+                    AND (v.voucher_type = 'Sales' OR ba.type = 'Opening')
                     AND v.company_id = ?
                 ");
                 $stmt->execute([$adj['allocation_id'], $input['party_ledger_id'], $companyId]);
@@ -375,7 +375,7 @@ try {
             // Generate receipt number
             $voucherNo = isset($input['voucher_no']) && $input['voucher_no']
                 ? $input['voucher_no']
-                : VoucherHelper::generateVoucherNo($pdo, 'Receipt', $companyId, 1);
+                : VoucherHelper::generateVoucherNo($pdo, 'Receipt', $companyId, 1, $voucherDate);
 
             // Calculate total (with optional deductions)
             $tdsAmount = floatval($input['tds_amount'] ?? 0);
@@ -663,9 +663,9 @@ try {
                     INNER JOIN vouchers v ON ve.voucher_id = v.id
                     WHERE ba.id = ?
                     AND ba.ledger_id = ?
-                    AND ba.type = 'New'
+                    AND ba.type IN ('New', 'Opening')
                     AND v.status = 'posted'
-                    AND v.voucher_type = 'Sales'
+                    AND (v.voucher_type = 'Sales' OR ba.type = 'Opening')
                     AND v.company_id = ?
                 ");
                 $stmt->execute([$allocationId, $input['party_ledger_id'], $companyId]);
@@ -677,9 +677,9 @@ try {
                     INNER JOIN vouchers v ON ve.voucher_id = v.id
                     WHERE ba.bill_no = ?
                     AND ba.ledger_id = ?
-                    AND ba.type = 'New'
+                    AND ba.type IN ('New', 'Opening')
                     AND v.status = 'posted'
-                    AND v.voucher_type = 'Sales'
+                    AND (v.voucher_type = 'Sales' OR ba.type = 'Opening')
                     AND v.company_id = ?
                     ORDER BY ba.id DESC
                     LIMIT 1

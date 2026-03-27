@@ -239,7 +239,7 @@ try {
             // Generate quotation number
             $voucherNo = isset($input['voucher_no']) && $input['voucher_no']
                 ? $input['voucher_no']
-                : VoucherHelper::generateVoucherNo($pdo, 'Quotation', $companyId, 1);
+                : VoucherHelper::generateVoucherNo($pdo, 'Quotation', $companyId, 1, $input['voucher_date'] ?? null);
 
             // Calculate totals (Simple calculation without GST)
             $subtotal = 0;

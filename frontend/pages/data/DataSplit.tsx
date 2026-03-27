@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Scissors,
   ShieldCheck,
@@ -37,21 +37,48 @@ interface VerifyCheck {
   affected_vouchers?: AffectedVoucher[];
 }
 
+interface PendingBill {
+  ledger_name: string;
+  bill_no: string;
+  bill_date: string;
+  original_amount: number;
+  pending_amount: number;
+  bill_type: string;
+  voucher_type: string;
+  age_days: number;
+}
+
 interface VerifyResult {
   checks: VerifyCheck[];
   can_proceed: boolean;
+  pending_bills: PendingBill[];
   summary: {
     vouchers_before_split: number;
     vouchers_from_split: number;
     total_ledgers: number;
+    pending_bills_count: number;
   };
 }
 
 interface SplitResult {
-  company_a: { id: number; name: string; code: string; voucher_count: number; period: string };
-  company_b: { id: number; name: string; code: string; voucher_count: number; period: string };
+  source_company: { id: number; name: string; code: string; period: string };
+  company_b: { id: number; name: string; code: string; voucher_count: number; period: string; bills_carried: number; advances_carried: number; stock_items_set: number };
   opening_balances_set: number;
   split_date: string;
+}
+
+interface SplitHistoryEntry {
+  id: number;
+  split_date: string;
+  company_a_id: number;
+  company_a_name: string;
+  company_a_code: string;
+  company_b_id: number;
+  company_b_name: string;
+  company_b_code: string;
+  company_a_status: string;
+  company_b_status: string;
+  created_at: string;
 }
 
 type Stage = 'configure' | 'verify' | 'execute' | 'done';
@@ -73,9 +100,8 @@ const StageIndicator: React.FC<{ current: Stage }> = ({ current }) => {
     <div className="flex items-center gap-0 mb-8">
       {stages.map((s, i) => {
         const idx = order.indexOf(s.key);
-        const isDone    = idx < currentIdx;
-        const isActive  = idx === currentIdx;
-        const isPending = idx > currentIdx;
+        const isDone   = idx < currentIdx;
+        const isActive = idx === currentIdx;
 
         return (
           <React.Fragment key={s.key}>
@@ -236,22 +262,29 @@ const DataSplit: React.FC = () => {
 
   // Configure form
   const [splitDate,    setSplitDate]    = useState('');
-  const [companyAName, setCompanyAName] = useState('');
-  const [companyACode, setCompanyACode] = useState('');
   const [companyBName, setCompanyBName] = useState('');
-  const [companyBCode, setCompanyBCode] = useState('');
 
   // Results
-  const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
-  const [splitResult,  setSplitResult]  = useState<SplitResult | null>(null);
-  const [error,        setError]        = useState<string | null>(null);
-  const [loading,      setLoading]      = useState(false);
+  const [verifyResult,  setVerifyResult]  = useState<VerifyResult | null>(null);
+  const [splitResult,   setSplitResult]   = useState<SplitResult | null>(null);
+  const [error,         setError]         = useState<string | null>(null);
+  const [loading,       setLoading]       = useState(false);
+  const [history,       setHistory]       = useState<SplitHistoryEntry[]>([]);
+  const [historyLoading,setHistoryLoading]= useState(false);
+
+  useEffect(() => {
+    setHistoryLoading(true);
+    apiClient('/data/split.php?action=history')
+      .then((res: any) => { if (res.success) setHistory(res.data?.history ?? []); })
+      .catch(() => {})
+      .finally(() => setHistoryLoading(false));
+  }, [stage]);
 
   // ── Verify ──────────────────────────────────────────────────────────────────
   const runVerify = async () => {
     if (!splitDate) { setError('Please select a split date.'); return; }
-    if (!companyAName.trim() || !companyACode.trim() || !companyBName.trim() || !companyBCode.trim()) {
-      setError('Please fill in all company name and code fields.');
+    if (!companyBName.trim()) {
+      setError('Please enter a name for the new company.');
       return;
     }
     setError(null);
@@ -280,10 +313,7 @@ const DataSplit: React.FC = () => {
         body: JSON.stringify({
           action:         'execute',
           split_date:     splitDate,
-          company_a_name: companyAName,
-          company_a_code: companyACode,
           company_b_name: companyBName,
-          company_b_code: companyBCode,
         }),
       });
       if (!res.success) throw new Error(res.message || 'Split failed');
@@ -300,10 +330,7 @@ const DataSplit: React.FC = () => {
   const reset = () => {
     setStage('configure');
     setSplitDate('');
-    setCompanyAName('');
-    setCompanyACode('');
     setCompanyBName('');
-    setCompanyBCode('');
     setVerifyResult(null);
     setSplitResult(null);
     setError(null);
@@ -315,7 +342,7 @@ const DataSplit: React.FC = () => {
       <div>
         <h1 className="text-2xl font-black text-slate-900 tracking-tight">Split Company Data</h1>
         <p className="text-sm text-slate-500 font-bold mt-1">
-          Partition your data into two separate companies at a specific date.
+          Create a new company from a split date — this company keeps all history, the new one starts with opening balances.
         </p>
       </div>
 
@@ -374,73 +401,40 @@ const DataSplit: React.FC = () => {
                 className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
               <p className="text-[11px] text-slate-400 font-bold mt-1.5">
-                Company A: all vouchers before this date. Company B: vouchers from this date onwards.
+                This company keeps all vouchers before this date. The new company gets vouchers from this date onwards with opening balances.
               </p>
             </div>
 
-            {/* Company A */}
-            <div className="border border-slate-100 rounded-xl p-4 space-y-3 bg-slate-50/60">
-              <p className="text-xs font-black text-slate-600 uppercase tracking-widest flex items-center gap-2">
-                <Building2 size={13} className="text-slate-400" /> Company A — Pre-Split Period
-              </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                    Company Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={companyAName}
-                    onChange={(e) => setCompanyAName(e.target.value)}
-                    placeholder="e.g. JustBuyPC (Old)"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                    Company Code <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={companyACode}
-                    onChange={(e) => setCompanyACode(e.target.value.toUpperCase())}
-                    placeholder="e.g. JBPC-A"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white uppercase"
-                  />
-                </div>
+            {/* Original company stays as archive — no input needed */}
+            <div className="border border-slate-100 rounded-xl p-4 bg-slate-50/60 flex items-start gap-3">
+              <div className="w-7 h-7 bg-slate-200 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Building2 size={14} className="text-slate-500" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-slate-600 uppercase tracking-widest">Historical Archive (this company)</p>
+                <p className="text-xs text-slate-500 font-bold mt-0.5">
+                  This company keeps all existing vouchers and becomes the read-only archive. No new entry is created for it.
+                </p>
               </div>
             </div>
 
-            {/* Company B */}
+            {/* New Company B */}
             <div className="border border-indigo-100 rounded-xl p-4 space-y-3 bg-indigo-50/40">
               <p className="text-xs font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
-                <Building2 size={13} /> Company B — Post-Split Period (with Opening Balances)
+                <Building2 size={13} /> New Company — Post-Split (with Opening Balances)
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-black text-indigo-500 uppercase tracking-widest mb-1.5">
-                    Company Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={companyBName}
-                    onChange={(e) => setCompanyBName(e.target.value)}
-                    placeholder="e.g. JustBuyPC (New)"
-                    className="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-black text-indigo-500 uppercase tracking-widest mb-1.5">
-                    Company Code <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={companyBCode}
-                    onChange={(e) => setCompanyBCode(e.target.value.toUpperCase())}
-                    placeholder="e.g. JBPC-B"
-                    className="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white uppercase"
-                  />
-                </div>
+              <div>
+                <label className="block text-[11px] font-black text-indigo-500 uppercase tracking-widest mb-1.5">
+                  Company Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={companyBName}
+                  onChange={(e) => setCompanyBName(e.target.value)}
+                  placeholder="e.g. JustBuyPC 2025"
+                  className="w-full px-3 py-2 border border-indigo-200 rounded-lg text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                />
+                <p className="text-[11px] text-indigo-400 font-bold mt-1">Company code is auto-generated from your current code + split year.</p>
               </div>
             </div>
 
@@ -589,31 +583,31 @@ const DataSplit: React.FC = () => {
             <div>
               <h2 className="font-black text-emerald-900 text-lg">Split Complete!</h2>
               <p className="text-sm font-bold text-emerald-700">
-                Two new companies have been created from your data.
+                One new company has been created. This company remains as the historical archive.
               </p>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {/* Company A card */}
+            {/* Archive (original) card */}
             <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <Building2 size={16} className="text-blue-600" />
+                <div className="w-8 h-8 bg-slate-100 rounded-xl flex items-center justify-center">
+                  <Building2 size={16} className="text-slate-500" />
                 </div>
                 <div>
-                  <p className="font-black text-slate-900 text-sm">{splitResult.company_a.name}</p>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{splitResult.company_a.code}</p>
+                  <p className="font-black text-slate-900 text-sm">{splitResult.source_company.name}</p>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{splitResult.source_company.code}</p>
                 </div>
               </div>
               <div className="space-y-1.5">
                 <div className="flex justify-between text-xs font-bold">
-                  <span className="text-slate-500">Period</span>
-                  <span className="text-slate-700">{splitResult.company_a.period}</span>
+                  <span className="text-slate-500">Role</span>
+                  <span className="text-slate-600 font-black">Historical Archive</span>
                 </div>
                 <div className="flex justify-between text-xs font-bold">
-                  <span className="text-slate-500">Vouchers</span>
-                  <span className="text-blue-700 font-black">{splitResult.company_a.voucher_count}</span>
+                  <span className="text-slate-500">Period</span>
+                  <span className="text-slate-700">{splitResult.source_company.period}</span>
                 </div>
               </div>
             </div>
@@ -642,6 +636,19 @@ const DataSplit: React.FC = () => {
                   <span className="text-slate-500">Opening Balances Set</span>
                   <span className="text-emerald-700 font-black">{splitResult.opening_balances_set} ledgers</span>
                 </div>
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-slate-500">Opening Stock Set</span>
+                  <span className="text-emerald-700 font-black">{splitResult.company_b.stock_items_set ?? 0} items</span>
+                </div>
+                {(splitResult.company_b.bills_carried > 0 || splitResult.company_b.advances_carried > 0) && (
+                  <div className="flex justify-between text-xs font-bold">
+                    <span className="text-slate-500">Bills Carried Forward</span>
+                    <span className="text-amber-700 font-black">
+                      {splitResult.company_b.bills_carried} bills
+                      {splitResult.company_b.advances_carried > 0 && `, ${splitResult.company_b.advances_carried} advances`}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -655,7 +662,11 @@ const DataSplit: React.FC = () => {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-indigo-500 mt-0.5">•</span>
-                Verify the Trial Balance and Balance Sheet for each new company
+                Verify opening stock in Stock Summary for Company B — it shows closing qty from the split date
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-indigo-500 mt-0.5">•</span>
+                For purchase/sales history of any stock item, switch to the old company (Company A)
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-indigo-500 mt-0.5">•</span>
@@ -674,6 +685,43 @@ const DataSplit: React.FC = () => {
           >
             <RefreshCw size={14} /> Start Another Split
           </button>
+        </div>
+      )}
+
+      {/* ── Split History ──────────────────────────────────────────────────── */}
+      {stage === 'configure' && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+          <h3 className="font-black text-slate-900 text-sm uppercase tracking-widest">Split History</h3>
+          {historyLoading ? (
+            <div className="flex items-center gap-2 text-xs text-slate-400 font-bold py-2">
+              <Loader2 size={14} className="animate-spin" /> Loading...
+            </div>
+          ) : history.length === 0 ? (
+            <p className="text-xs text-slate-400 font-bold py-2">No splits have been performed on this company yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {history.map((h) => (
+                <div key={h.id} className="border border-slate-100 rounded-xl p-3 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black text-slate-700">Split on {new Date(h.split_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                    <span className="text-[10px] text-slate-400 font-bold">{new Date(h.created_at).toLocaleDateString()}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-slate-50 rounded-lg p-2">
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-0.5">Archive (original)</p>
+                      <p className="font-black text-slate-800">{h.company_a_name}</p>
+                      <p className="text-slate-500 font-bold">{h.company_a_code}</p>
+                    </div>
+                    <div className="bg-indigo-50 rounded-lg p-2">
+                      <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest mb-0.5">Company B (Post-split)</p>
+                      <p className="font-black text-indigo-800">{h.company_b_name}</p>
+                      <p className="text-indigo-500 font-bold">{h.company_b_code}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

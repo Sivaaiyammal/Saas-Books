@@ -81,10 +81,10 @@ try {
                 INNER JOIN voucher_entries ve ON ba.voucher_entry_id = ve.id
                 INNER JOIN vouchers v ON ve.voucher_id = v.id
                 WHERE ba.ledger_id = ?
-                AND ba.type = 'New'
+                AND ba.type IN ('New', 'Opening')
                 AND ba.pending_amount > 0
                 AND v.status = 'posted'
-                AND v.voucher_type = 'Purchase'
+                AND (v.voucher_type = 'Purchase' OR ba.type = 'Opening')
                 AND v.company_id = ?
                 ORDER BY ba.bill_date ASC
             ");
@@ -366,8 +366,8 @@ try {
                     INNER JOIN vouchers v ON ve.voucher_id = v.id
                     WHERE ba.id = ?
                     AND ba.ledger_id = ?
-                    AND ba.type = 'New'
-                    AND v.voucher_type = 'Purchase'
+                    AND ba.type IN ('New', 'Opening')
+                    AND (v.voucher_type = 'Purchase' OR ba.type = 'Opening')
                     AND v.company_id = ?
                 ");
                 $stmt->execute([$adj['allocation_id'], $input['party_ledger_id'], $companyId]);
@@ -387,7 +387,7 @@ try {
 
         try {
             // Generate voucher number
-            $voucherNo = VoucherHelper::generateVoucherNo($pdo, 'Payment', $companyId, 1);
+            $voucherNo = VoucherHelper::generateVoucherNo($pdo, 'Payment', $companyId, 1, $voucherDate);
 
             // Create voucher
             $stmt = $pdo->prepare("

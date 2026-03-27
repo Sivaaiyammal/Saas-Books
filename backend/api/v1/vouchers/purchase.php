@@ -268,7 +268,7 @@ try {
             // Generate invoice number
             $voucherNo = isset($input['voucher_no']) && $input['voucher_no']
                 ? $input['voucher_no']
-                : VoucherHelper::generateVoucherNo($pdo, 'Purchase', $companyId, 1);
+                : VoucherHelper::generateVoucherNo($pdo, 'Purchase', $companyId, 1, $input['voucher_date'] ?? null);
 
             // Calculate totals
             $subtotal = 0;

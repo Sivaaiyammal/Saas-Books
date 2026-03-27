@@ -29,6 +29,7 @@ require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
 require_once __DIR__ . '/../../../helpers/moduleAccess.php';
+require_once __DIR__ . '/../../../helpers/voucher.php';
 require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
@@ -287,9 +288,13 @@ try {
 
         try {
             // Generate SO number
-            $stmt  = $pdo->query("SELECT MAX(id) FROM orders WHERE order_type = 'Sales'");
-            $maxId = $stmt->fetchColumn() ?? 0;
-            $orderNo = $input['order_no'] ?? ('SO-' . str_pad($maxId + 1, 6, '0', STR_PAD_LEFT));
+            $orderNo = $input['order_no'] ?? VoucherHelper::generateOrderNo(
+                $pdo,
+                'Sales',
+                $companyId,
+                1,
+                $input['order_date'] ?? null
+            );
 
             $totalQty      = 0;
             $totalAmount   = 0;

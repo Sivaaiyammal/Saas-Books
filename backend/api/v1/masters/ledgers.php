@@ -102,9 +102,9 @@ try {
                     INNER JOIN voucher_entries ve ON ba.voucher_entry_id = ve.id
                     INNER JOIN vouchers v ON ve.voucher_id = v.id
                     WHERE ba.ledger_id = ?
-                    AND ba.type = 'New'
+                    AND ba.type IN ('New', 'Opening')
                     AND ba.pending_amount > 0
-                    AND v.voucher_type = 'Sales'
+                    AND (v.voucher_type = 'Sales' OR ba.type = 'Opening')
                     AND v.status = 'posted'
                     ORDER BY ba.bill_date ASC
                 ");
@@ -134,9 +134,9 @@ try {
                     INNER JOIN voucher_entries ve ON ba.voucher_entry_id = ve.id
                     INNER JOIN vouchers v ON ve.voucher_id = v.id
                     WHERE ba.ledger_id = ?
-                    AND ba.type = 'New'
+                    AND ba.type IN ('New', 'Opening')
                     AND ba.pending_amount > 0
-                    AND v.voucher_type = 'Purchase'
+                    AND (v.voucher_type = 'Purchase' OR ba.type = 'Opening')
                     AND v.status = 'posted'
                     ORDER BY ba.bill_date ASC
                 ");

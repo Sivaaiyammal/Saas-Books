@@ -24,6 +24,7 @@ require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
 require_once __DIR__ . '/../../../helpers/moduleAccess.php';
+require_once __DIR__ . '/../../../helpers/voucher.php';
 require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
@@ -242,12 +243,15 @@ try {
 
         try {
             // Generate order number
-            $prefix = $input['order_type'] === 'Sales' ? 'SO' : 'PO';
-            $stmt = $pdo->query("SELECT MAX(id) FROM orders");
-            $maxId = $stmt->fetchColumn() ?? 0;
             $orderNo = isset($input['order_no']) && $input['order_no']
                 ? $input['order_no']
-                : $prefix . '-' . str_pad($maxId + 1, 6, '0', STR_PAD_LEFT);
+                : VoucherHelper::generateOrderNo(
+                    $pdo,
+                    $input['order_type'],
+                    $companyId,
+                    1,
+                    $input['order_date'] ?? null
+                );
 
             // Calculate totals from items
             $totalQty = 0;

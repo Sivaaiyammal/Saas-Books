@@ -133,6 +133,10 @@ try {
         }
         unset($plan);
 
+        // Exclude split companies (split_parent_id IS NOT NULL) — they live in split_registry
+        $hasSplitParent = tableHasColumn($db, 'companies', 'split_parent_id');
+        $splitFilter = $hasSplitParent ? 'WHERE c.split_parent_id IS NULL' : '';
+
         $companiesStmt = $db->query(
             "SELECT
                 c.id,
@@ -179,6 +183,7 @@ try {
                 WHERE cu.status = 'active'
                 GROUP BY cu.company_id
             ) company_stats ON company_stats.company_id = c.id
+            $splitFilter
             ORDER BY c.id DESC"
         );
 

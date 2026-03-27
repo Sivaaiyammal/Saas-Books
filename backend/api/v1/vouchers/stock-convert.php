@@ -33,6 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/voucher.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 $user = AuthMiddleware::authenticate();
@@ -272,11 +273,24 @@ try {
 
         try {
             // Generate voucher number
-            $stmt = $pdo->prepare("SELECT MAX(id) as max_id FROM stock_conversions");
-            $stmt->execute();
-            $result = $stmt->fetch();
-            $nextId = ($result['max_id'] ?? 0) + 1;
-            $voucherNo = 'SC-' . str_pad($nextId, 5, '0', STR_PAD_LEFT);
+            [$fyStart, $fyEnd] = VoucherHelper::getFinancialYearRange($conversionDate);
+            $stmt = $pdo->prepare("
+                SELECT voucher_no
+                FROM stock_conversions
+                WHERE voucher_no LIKE 'SC-%'
+                AND conversion_date BETWEEN ? AND ?
+                ORDER BY id DESC
+                LIMIT 1
+            ");
+            $stmt->execute([$fyStart, $fyEnd]);
+            $lastVoucher = $stmt->fetch();
+
+            if ($lastVoucher && preg_match('/(\\d+)$/', (string)$lastVoucher['voucher_no'], $matches)) {
+                $nextNumber = (int)$matches[1] + 1;
+            } else {
+                $nextNumber = 1;
+            }
+            $voucherNo = 'SC-' . $nextNumber;
 
             // Create stock conversion header
             $stmt = $pdo->prepare("
