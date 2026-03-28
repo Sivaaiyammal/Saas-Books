@@ -125,7 +125,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 </div>
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 group-hover:text-slate-900 transition-colors">Remember me</span>
               </label>
-              <a href="#" className="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 transition-colors">Forgot Password?</a>
+              <Link to="/forgot-password" className="text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 transition-colors">Forgot Password?</Link>
             </div>
 
             <button

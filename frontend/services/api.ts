@@ -446,6 +446,24 @@ export const authApi = {
     return apiClient('/auth/me.php');
   },
 
+  async forgotPassword(email: string): Promise<AuthResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/forgot-password.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    return response.json();
+  },
+
+  async resetPassword(token: string, password: string, password_confirmation: string): Promise<AuthResponse> {
+    const response = await fetch(`${API_BASE_URL}/auth/reset-password.php`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password, password_confirmation }),
+    });
+    return response.json();
+  },
+
   async updateProfile(payload: FormData): Promise<AuthResponse> {
     const token = getAuthToken();
 

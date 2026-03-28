@@ -54,9 +54,9 @@ try {
     }
 
     $stmt = $pdo->prepare("
-        SELECT id, email, reset_token_expiry
+        SELECT id, email, status, reset_token_expiry
         FROM users
-        WHERE reset_token = ? AND status = 'active'
+        WHERE reset_token = ?
     ");
 
     $stmt->execute([$token]);

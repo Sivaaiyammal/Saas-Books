@@ -58,7 +58,7 @@ class EmailHelper {
     }
 
     public static function sendPasswordReset($email, $name, $resetToken) {
-        $resetUrl = ($_ENV['APP_URL'] ?? 'http://localhost') . '/reset-password.html?token=' . $resetToken;
+        $resetUrl = ($_ENV['APP_URL'] ?? 'http://localhost') . '/reset-password?token=' . $resetToken;
         $appName = $_ENV['APP_NAME'] ?? "Saas Books";
 
         $subject = "Password Reset Request - {$appName}";
