@@ -32,7 +32,7 @@ function remap(array $map, ?int $id): ?int
 }
 
 /**
- * Clone all masters (groups, ledgers, items, units, taxes, godowns, financial_years)
+ * Clone all masters (groups, ledgers, items, units, taxes, financial_years)
  * from source company to destination company.
  *
  * Returns ID-mapping arrays for use when cloning vouchers.
@@ -45,7 +45,6 @@ function cloneMasters(PDO $pdo, int $srcId, int $dstId): array
         'items'    => [],
         'units'    => [],
         'taxes'    => [],
-        'godowns'  => [],
     ];
 
     // ── 1. Groups (two-pass to handle parent_id self-reference) ──────────────
@@ -109,19 +108,7 @@ function cloneMasters(PDO $pdo, int $srcId, int $dstId): array
         }
     } catch (PDOException $e) { /* skip if table missing */ }
 
-    // ── 5. Godowns ────────────────────────────────────────────────────────────
-    try {
-        $rows = $pdo->prepare("SELECT * FROM godowns WHERE company_id <=> ? ORDER BY id ASC");
-        $rows->execute([$srcId]);
-        foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $g) {
-            $newRow = $g;
-            unset($newRow['id']);
-            $newRow['company_id'] = $dstId;
-            $maps['godowns'][$g['id']] = insertRow($pdo, 'godowns', $newRow);
-        }
-    } catch (PDOException $e) { /* skip if table missing */ }
-
-    // ── 6. Items (stock items) ─────────────────────────────────────────────────
+    // ── 5. Items (stock items) ─────────────────────────────────────────────────
     try {
         $rows = $pdo->prepare("SELECT * FROM items WHERE company_id <=> ? ORDER BY id ASC");
         $rows->execute([$srcId]);
@@ -135,7 +122,7 @@ function cloneMasters(PDO $pdo, int $srcId, int $dstId): array
         // table may not exist in this deployment
     }
 
-    // ── 7. Financial Years ────────────────────────────────────────────────────
+    // ── 6. Financial Years ────────────────────────────────────────────────────
     $rows = $pdo->prepare("SELECT * FROM financial_years WHERE company_id <=> ? ORDER BY start_date ASC");
     $rows->execute([$srcId]);
     foreach ($rows->fetchAll(PDO::FETCH_ASSOC) as $fy) {
@@ -360,7 +347,7 @@ function cloneVouchers(
         $newRow['product_id']    = remap($maps['items'],   $item['product_id']);
         $newRow['unit_id']       = remap($maps['units'],   $item['unit_id']);
         $newRow['tax_id']        = remap($maps['taxes'],   $item['tax_id']);
-        $newRow['godown_id']     = remap($maps['godowns'], $item['godown_id']);
+        $newRow['godown_id']     = null;
         $newRow['order_item_id'] = null; // cross-company order links are not valid after split
         insertRow($pdo, 'voucher_items', $newRow);
     }

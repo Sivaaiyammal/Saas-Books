@@ -62,12 +62,6 @@ export const suppliers = [
   { id: '3', name: 'Supreme Threads', address: 'Textile Park, Surat', gst: '24EEEEE4567E1Z8', phone: '+91 88888 66666' },
 ];
 
-export const godowns = [
-  { id: '1', name: 'Main Godown - Surat', address: '102 Textile Tower, Surat', gst: '24AAAAA1234A1Z5' },
-  { id: '2', name: 'Branch Office - Ahmedabad', address: '45 Ring Road, Ahmedabad', gst: '24AAAAA1234A1Z5' },
-  { id: '3', name: 'Central Warehouse', address: 'GIDC Phase 2, Surat', gst: '24AAAAA1234A1Z5' },
-];
-
 export interface VoucherRow {
   id: number;
   itemId: string;

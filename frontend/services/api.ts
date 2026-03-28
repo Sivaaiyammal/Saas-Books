@@ -630,27 +630,6 @@ export const mastersApi = {
       method: 'DELETE',
       body: JSON.stringify({ id }),
     });
-  },
-  async getGodowns(): Promise<{ success: boolean; data: { godowns: any[] } }> {
-    return apiClient('/masters/godown.php');
-  },
-  async createGodown(data: any): Promise<{ success: boolean; message: string }> {
-    return apiClient('/masters/godown.php', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-  async updateGodown(id: number, data: any): Promise<{ success: boolean; message: string }> {
-    return apiClient(`/masters/godown.php?id=${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ ...data, id }),
-    });
-  },
-  async deleteGodown(id: number): Promise<{ success: boolean; message: string }> {
-    return apiClient('/masters/godown.php', {
-      method: 'DELETE',
-      body: JSON.stringify({ id }),
-    });
   }
 };
 
@@ -664,7 +643,6 @@ interface SalesVoucherItem {
   discount_amount?: number;
   tax_id: number;
   tax_percent: number;
-  godown_id: number;
   description?: string;
 }
 

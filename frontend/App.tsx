@@ -6,7 +6,6 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Ledgers from './pages/masters/Ledgers';
 import StockItems from './pages/masters/StockItems';
-import Godowns from './pages/masters/Godowns';
 import Tax from './pages/masters/Tax';
 import Units from './pages/masters/Units';
 import StockItemGroups from './pages/masters/StockItemGroups';
@@ -149,7 +148,6 @@ const App: React.FC = () => {
           {/* Masters */}
           <Route path="/masters/ledgers" element={<Ledgers />} />
           <Route path="/masters/items" element={<StockItems />} />
-          <Route path="/masters/godowns" element={<Godowns />} />
           <Route path="/masters/tax" element={<Tax />} />
           <Route path="/masters/units" element={<Units />} />
           <Route path="/masters/stock-groups" element={<StockItemGroups />} />

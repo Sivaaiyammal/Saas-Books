@@ -28,7 +28,6 @@ const Reports: React.FC = () => {
       title: 'Inventory Reports',
       items: [
         { name: 'Stock Summary', desc: 'Status of stock-in-hand group-wise', id: 'stock_summary' },
-        // { name: 'Godown Stock', desc: 'Inventory distribution across godowns', id: 'godown_stock' },
         // { name: 'Stock Ageing', desc: 'Analysis of stock duration', id: 'stock_ageing' },
         { name: 'Movement Analysis', desc: 'Flow of items in and out', id: 'movement' },
       ]

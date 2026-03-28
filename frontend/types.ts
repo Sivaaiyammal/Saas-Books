@@ -134,23 +134,3 @@ export interface LedgerGroup {
   created_at: string;
   child_count: number;
 }
-
-export interface Godown {
-  id: number;
-  name: string;
-  code: string;
-  gst_no: string | null;
-  address: string;
-  city: string | null;
-  state: string | null;
-  pincode: string | null;
-  phone: string | null;
-  email: string | null;
-  manager_name: string | null;
-  capacity: string | null;
-  is_default: boolean | number;
-  description: string | null;
-  status: 'active' | 'inactive';
-  created_at: string;
-  updated_at: string;
-}

@@ -40,7 +40,6 @@ try {
                 'stock_items'     => "SELECT * FROM stock_items WHERE company_id <=> ?",
                 'units'           => "SELECT * FROM units WHERE company_id <=> ?",
                 'taxes'           => "SELECT * FROM taxes WHERE company_id <=> ?",
-                'godowns'         => "SELECT * FROM godowns WHERE company_id <=> ?",
                 'financial_years' => "SELECT * FROM financial_years WHERE company_id <=> ?",
             ];
 
@@ -123,7 +122,7 @@ try {
                 }
             };
 
-            foreach (['ledgers', 'units', 'taxes', 'godowns', 'financial_years'] as $table) {
+            foreach (['ledgers', 'units', 'taxes', 'financial_years'] as $table) {
                 if (!empty($input[$table])) {
                     $upsert($table, $input[$table]);
                     $restored[] = $table;

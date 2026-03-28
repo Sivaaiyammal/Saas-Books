@@ -168,7 +168,6 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
           children: [
             { name: 'Ledgers', path: '/masters/ledgers' },
             { name: 'Stock Items', path: '/masters/items' },
-            { name: 'Godowns', path: '/masters/godowns' },
             { name: 'Tax', path: '/masters/tax' },
             { name: 'Units', path: '/masters/units' },
             { name: 'Stock Item Groups', path: '/masters/stock-groups' },

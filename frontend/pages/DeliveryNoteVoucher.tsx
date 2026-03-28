@@ -215,14 +215,12 @@ const DeliveryNoteVoucher: React.FC = () => {
           itemsRes,
           unitsRes,
           taxesRes,
-          godownsRes,
           settingsRes,
         ] = await Promise.all([
           mastersApi.getLedgersByGroup(2, 3), // group_id=2 for billing/consignee
           mastersApi.getItems(),
           mastersApi.getUnits(),
           mastersApi.getTaxes(),
-          mastersApi.getGodowns(),
           settingsApi.getGstSettings(),
         ]);
 
@@ -241,12 +239,6 @@ const DeliveryNoteVoucher: React.FC = () => {
         }
         if (taxesRes.success && taxesRes.data.taxes) {
           setTaxes(taxesRes.data.taxes);
-        }
-        if (godownsRes.success && godownsRes.data.godowns) {
-          setGodowns(godownsRes.data.godowns);
-          if (godownsRes.data.godowns.length > 0) {
-            setSelectedGodownId(godownsRes.data.godowns[0].id);
-          }
         }
         if (settingsRes.success && settingsRes.data) {
           setBusinessDetails(settingsRes.data);
@@ -531,7 +523,7 @@ const DeliveryNoteVoucher: React.FC = () => {
             discount_amount: 0,
             tax_id: tax?.id || stockItem?.tax_id || 1,
             tax_percent: row.gst,
-            godown_id: selectedGodownId || 1,
+            godown_id: null,
           };
         });
 
@@ -689,7 +681,7 @@ const DeliveryNoteVoucher: React.FC = () => {
             discount_amount: 0,
             tax_id: tax?.id || stockItem?.tax_id || 1,
             tax_percent: row.gst,
-            godown_id: selectedGodownId || 1,
+            godown_id: null,
           };
         });
 
