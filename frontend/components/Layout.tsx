@@ -106,7 +106,20 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
         setLoadingUser(false);
       }
     };
+
+    const handleUserProfileUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ user?: any }>;
+      if (customEvent.detail?.user) {
+        setUser((prev: any) => ({ ...prev, ...customEvent.detail.user }));
+      }
+    };
+
+    window.addEventListener('user-profile-updated', handleUserProfileUpdated as EventListener);
     fetchInitialData();
+
+    return () => {
+      window.removeEventListener('user-profile-updated', handleUserProfileUpdated as EventListener);
+    };
   }, []);
 
   useEffect(() => {
@@ -217,7 +230,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
         ...(isModuleEnabled('quotation') ? [{ name: 'New Quotation', path: '/vouchers/quotation', icon: <Plus size={18} className="text-blue-500" /> }] : []),
         ...(isModuleEnabled('receipt') ? [{ name: 'New Receipt', path: '/vouchers/receipt', icon: <Receipt size={18} className="text-indigo-500" /> }] : []),
         ...(isModuleEnabled('payment') ? [{ name: 'New Payment', path: '/vouchers/payment', icon: <CreditCard size={18} className="text-amber-500" /> }] : []),
-        { name: 'Settings', path: '/settings', icon: <Settings size={18} className="text-slate-500" /> },
+        { name: 'Company Details', path: '/settings', icon: <Settings size={18} className="text-slate-500" /> },
       ]
     }
   ];
@@ -434,8 +447,21 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
                     {loadingUser ? '...' : (user?.name || 'Admin')}
                   </p>
                 </div>
-                <div className="w-10 h-10 rounded-xl bg-indigo-600 border border-indigo-100 flex items-center justify-center text-white font-black shadow-lg shadow-indigo-100 uppercase overflow-hidden">
-                  {loadingUser ? <Loader2 size={16} className="animate-spin" /> : (user?.name?.[0] || 'U')}
+                <div className={`w-10 h-10 rounded-xl border flex items-center justify-center font-black shadow-lg uppercase overflow-hidden ${user?.profile_image_url ? 'bg-slate-100 border-slate-200 shadow-slate-100' : 'bg-indigo-600 border-indigo-100 text-white shadow-indigo-100'}`}>
+                  {loadingUser ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : user?.profile_image_url ? (
+                    <img
+                      src={user.profile_image_url}
+                      alt={user?.name || 'User'}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    user?.name?.[0] || 'U'
+                  )}
                 </div>
               </button>
 

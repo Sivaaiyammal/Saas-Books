@@ -28,6 +28,19 @@ try {
         ApiResponse::notFound('User not found');
     }
 
+    if (!empty($userData['profile_image'])) {
+        $normalizedProfileImage = ltrim(str_replace('\\', '/', (string)$userData['profile_image']), '/');
+        if (preg_match('#^https?://#i', $normalizedProfileImage)) {
+            $userData['profile_image_url'] = $normalizedProfileImage;
+        } else {
+            $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $userData['profile_image_url'] = $scheme . '://' . $host . '/' . $normalizedProfileImage;
+        }
+    } else {
+        $userData['profile_image_url'] = null;
+    }
+
     $userData['modules'] = ModuleAccessHelper::getCompanyModules($pdo, isset($userData['company_id']) ? (int)$userData['company_id'] : null);
     $userData['is_saas_admin'] = (($userData['role'] ?? '') === 'super_admin');
 

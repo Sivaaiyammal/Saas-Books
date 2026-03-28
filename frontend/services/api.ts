@@ -301,6 +301,8 @@ interface UserProfile {
   name: string;
   email: string;
   phone: string | null;
+  profile_image?: string | null;
+  profile_image_url?: string | null;
   company_id?: number | null;
   company_name?: string | null;
   role: string;
@@ -442,6 +444,33 @@ export const authApi = {
 
   async getMe(): Promise<AuthResponse> {
     return apiClient('/auth/me.php');
+  },
+
+  async updateProfile(payload: FormData): Promise<AuthResponse> {
+    const token = getAuthToken();
+
+    const response = await fetch(`${API_BASE_URL}/auth/profile.php`, {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: payload,
+    });
+
+    const responseText = await response.text();
+    let data: any = {};
+
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch (e) {
+      data = { message: `Server error: ${response.status} ${response.statusText}` };
+    }
+
+    if (!response.ok) {
+      throw new Error(data.message || `Request failed with status ${response.status}`);
+    }
+
+    return data;
   }
 };
 

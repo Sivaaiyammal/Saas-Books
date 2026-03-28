@@ -73,7 +73,7 @@ try {
             ApiResponse::error('Invalid JSON data');
         }
 
-        $required = ['gstin', 'username', 'ewbpwd', 'from_trade_name', 'from_addr1', 'from_place', 'from_state', 'from_pincode', 'from_state_code'];
+        $required = ['gstin', 'username', 'from_trade_name', 'from_addr1', 'from_place', 'from_state', 'from_pincode', 'from_state_code'];
         $errors   = [];
         foreach ($required as $field) {
             if (!isset($input[$field]) || trim((string)$input[$field]) === '') {
@@ -86,7 +86,7 @@ try {
 
         $gstin          = strtoupper(preg_replace('/[^A-Z0-9]/i', '', trim($input['gstin'])));
         $username       = trim($input['username']);
-        $ewbpwd         = trim($input['ewbpwd']);
+        $ewbpwdInput    = trim((string)($input['ewbpwd'] ?? ''));
         $fromTradeName  = trim($input['from_trade_name']);
         $fromAddr1      = trim($input['from_addr1']);
         $fromAddr2      = trim($input['from_addr2'] ?? '');
@@ -101,8 +101,17 @@ try {
         }
 
         // Check for existing row
-        $stmt    = $pdo->query("SELECT id FROM ewb_settings ORDER BY id DESC LIMIT 1");
+        $stmt    = $pdo->query("SELECT id, ewbpwd FROM ewb_settings ORDER BY id DESC LIMIT 1");
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$existing && $ewbpwdInput === '') {
+            ApiResponse::validationError(['ewbpwd' => ['ewbpwd is required']]);
+        }
+
+        $ewbpwd = $ewbpwdInput;
+        if ($existing && $ewbpwdInput === '') {
+            $ewbpwd = $existing['ewbpwd'];
+        }
 
         if ($existing) {
             // Update

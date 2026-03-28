@@ -2,6 +2,24 @@
 
 class AuthHelper {
 
+    private static $usersTableHasProfileImage = null;
+
+    private static function usersTableHasProfileImageColumn($pdo) {
+        if (self::$usersTableHasProfileImage !== null) {
+            return self::$usersTableHasProfileImage;
+        }
+
+        try {
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'users' AND column_name = 'profile_image'");
+            $stmt->execute();
+            self::$usersTableHasProfileImage = (bool)$stmt->fetchColumn();
+        } catch (PDOException $e) {
+            self::$usersTableHasProfileImage = false;
+        }
+
+        return self::$usersTableHasProfileImage;
+    }
+
     public static function hashPassword($password) {
         return password_hash($password, PASSWORD_BCRYPT, ['cost' => 12]);
     }
@@ -57,12 +75,17 @@ class AuthHelper {
 
     public static function getUserAuthContext($pdo, $userId) {
         try {
+            $profileImageSelect = self::usersTableHasProfileImageColumn($pdo)
+                ? 'u.profile_image'
+                : 'NULL AS profile_image';
+
             $stmt = $pdo->prepare("
                 SELECT
                     u.id,
                     u.name,
                     u.email,
                     u.phone,
+                    $profileImageSelect,
                     COALESCE(
                         u.company_id,
                         (
