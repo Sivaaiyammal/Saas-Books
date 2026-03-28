@@ -3,6 +3,7 @@
 class ApiResponse {
 
     public static function success($data = null, $message = 'Success', $code = 200) {
+        while (ob_get_level() > 0) { ob_end_clean(); }
         http_response_code($code);
         header('Content-Type: application/json');
 
@@ -20,6 +21,7 @@ class ApiResponse {
     }
 
     public static function error($message = 'An error occurred', $code = 400, $errors = null) {
+        while (ob_get_level() > 0) { ob_end_clean(); }
         http_response_code($code);
         header('Content-Type: application/json');
 

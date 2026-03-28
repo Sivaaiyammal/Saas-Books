@@ -190,9 +190,11 @@ const ReceiptRegister: React.FC = () => {
             }
           }
         });
+      } else {
+        alert(res.message || 'Failed to load receipt for editing.');
       }
-    } catch (err) {
-      console.error('Failed to load voucher for edit', err);
+    } catch (err: any) {
+      alert(err.message || 'Failed to load receipt for editing.');
     }
   };
 
@@ -511,11 +513,11 @@ const ReceiptRegister: React.FC = () => {
           <div className="relative w-full max-w-md bg-white rounded-[3rem] shadow-2xl border border-rose-100 overflow-hidden animate-in zoom-in-95 duration-300 p-12 text-center space-y-8">
             <div className="w-24 h-24 bg-rose-50 text-rose-500 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner border border-rose-100"><TriangleAlert size={48} /></div>
             <div className="space-y-3">
-              <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Void Record?</h3>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">Cancel Receipt?</h3>
               <p className="text-sm font-bold text-slate-500 leading-relaxed px-4">Permanently remove receipt <span className="text-indigo-600 font-black">#{selectedVoucher.voucher_no}</span>? This will impact ledger outstandings.</p>
             </div>
             <div className="flex flex-col gap-3">
-              <button disabled={isDeleting} onClick={confirmDelete} className="w-full py-5 bg-rose-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-2xl hover:bg-rose-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50">{isDeleting ? <Loader2 className="animate-spin" size={20} /> : <Trash2 size={20} />} Void Receipt</button>
+              <button disabled={isDeleting} onClick={confirmDelete} className="w-full py-5 bg-rose-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-2xl hover:bg-rose-700 transition-all flex items-center justify-center gap-3 disabled:opacity-50">{isDeleting ? <Loader2 className="animate-spin" size={20} /> : <Trash2 size={20} />} Cancel Receipt</button>
               <button disabled={isDeleting} onClick={() => setIsDeleteModalOpen(false)} className="w-full py-5 bg-slate-100 text-slate-500 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">Go Back</button>
             </div>
           </div>

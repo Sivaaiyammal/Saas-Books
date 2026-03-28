@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { vouchersApi, mastersApi } from "../../services/api";
 // --- Interfaces ---
 interface StockItemSummary {
   id: number;
@@ -108,7 +109,7 @@ const MovementAnalysis: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [summaryRes, groupsRes] = await Promise.all([
+      const [summaryResult, groupsResult] = await Promise.allSettled([
         vouchersApi.getStockMovement(
           startDate,
           endDate,
@@ -117,12 +118,14 @@ const MovementAnalysis: React.FC = () => {
         mastersApi.getStockGroups(),
       ]);
 
-      if (summaryRes.success) {
-        setItems(summaryRes.data.items);
-        setTotals(summaryRes.data.totals);
+      if (summaryResult.status === 'fulfilled' && summaryResult.value.success) {
+        setItems(summaryResult.value.data.items);
+        setTotals(summaryResult.value.data.totals);
+      } else if (summaryResult.status === 'rejected') {
+        setError(summaryResult.reason?.message || "Failed to load stock data");
       }
-      if (groupsRes.success) {
-        setGroups(groupsRes.data.item_groups);
+      if (groupsResult.status === 'fulfilled' && groupsResult.value.success) {
+        setGroups(groupsResult.value.data.item_groups);
       }
     } catch (err: any) {
       setError(err.message || "Analysis failed");

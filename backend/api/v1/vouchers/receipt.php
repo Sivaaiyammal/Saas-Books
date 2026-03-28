@@ -1,4 +1,5 @@
 <?php
+ob_start();
 /**
  * Receipt Voucher API
  *
@@ -311,13 +312,16 @@ try {
             ApiResponse::validationError(['party_ledger_id' => ['Party ledger not found or inactive']]);
         }
 
-        // Validate received_in ledger (Cash/Bank)
+        // Validate received_in ledger (Cash/Bank) — also allows sub-groups of Cash/Bank
         $stmt = $pdo->prepare("
             SELECT l.*, g.name as group_name
             FROM ledgers l
             INNER JOIN `groups` g ON l.group_id = g.id
             WHERE l.id = ? AND l.status = 'active'
-            AND g.name IN ('Cash-in-Hand', 'Bank Accounts')
+            AND (
+                g.name IN ('Cash-in-Hand', 'Bank Accounts')
+                OR g.parent_id IN (SELECT id FROM `groups` WHERE name IN ('Cash-in-Hand', 'Bank Accounts'))
+            )
         ");
         $stmt->execute([$input['received_in']]);
         $cashBankLedger = $stmt->fetch();
@@ -612,7 +616,10 @@ try {
             FROM ledgers l
             INNER JOIN `groups` g ON l.group_id = g.id
             WHERE l.id = ? AND l.status = 'active'
-            AND g.name IN ('Cash-in-Hand', 'Bank Accounts')
+            AND (
+                g.name IN ('Cash-in-Hand', 'Bank Accounts')
+                OR g.parent_id IN (SELECT id FROM `groups` WHERE name IN ('Cash-in-Hand', 'Bank Accounts'))
+            )
         ");
         $stmt->execute([$input['received_in']]);
         $cashBankLedger = $stmt->fetch();

@@ -485,14 +485,14 @@ try {
                 INSERT INTO vouchers (
                     company_id, voucher_type, voucher_no, voucher_date, reference_no,
                     financial_year_id, financial_year,
-                    party_ledger_id, order_id, delivery_note_id,
+                    party_ledger_id, delivery_note_id,
                     billing_name, billing_address, billing_city, billing_state, billing_pincode, billing_gstin, billing_phone,
                     consignee_same_as_billing,
                     consignee_name, consignee_address, consignee_city, consignee_state, consignee_pincode, consignee_gstin, consignee_phone,
                     place_of_supply,
                     vehicle_no, transporter_name, transporter_id,
                     total_amount, narration, status, created_by
-                ) VALUES (?, 'Sales', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, 'Sales', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             $stmt->execute([
@@ -503,7 +503,6 @@ try {
                 (int)$resolvedFy['id'],
                 $resolvedFy['code'],
                 $input['party_ledger_id'],
-                !empty($input['order_id']) ? (int)$input['order_id'] : null,
                 $deliveryNoteId,
                 $billingName,
                 $billingAddress,
@@ -1077,7 +1076,6 @@ try {
                     total_amount = ?,
                     narration = ?,
                     status = ?,
-                    order_id = ?,
                     delivery_note_id = ?
                 WHERE id = ?
             ");
@@ -1116,7 +1114,6 @@ try {
                 $grandTotal,
                 $input['narration'] ?? null,
                 $input['status'] ?? 'posted',
-                !empty($input['order_id']) ? (int)$input['order_id'] : null,
                 $putDeliveryNoteId,
                 $id
             ]);

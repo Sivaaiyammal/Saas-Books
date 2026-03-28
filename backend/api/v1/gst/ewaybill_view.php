@@ -21,9 +21,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
-AuthMiddleware::authenticate();
+$user = AuthMiddleware::authenticate();
 
 function ewbFormatDateTime($value) {
     if (empty($value)) return null;
@@ -52,7 +53,8 @@ try {
         ApiResponse::error('Method not allowed', 405);
     }
 
-    $pdo      = getDBConnection();
+    $pdo       = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $ewbNo    = trim($_GET['ewb_no'] ?? '');
     $voucherId = isset($_GET['voucher_id']) ? (int)$_GET['voucher_id'] : null;
 
@@ -112,7 +114,8 @@ try {
     }
 
     // Fetch EWB settings (supplier / dispatch info)
-    $settingsStmt = $pdo->query("SELECT * FROM ewb_settings ORDER BY id DESC LIMIT 1");
+    $settingsStmt = $pdo->prepare("SELECT * FROM ewb_settings WHERE company_id = ? ORDER BY id DESC LIMIT 1");
+    $settingsStmt->execute([$companyId]);
     $settings     = $settingsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
     // Parse stored provider API response for extra fields

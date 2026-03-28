@@ -867,6 +867,16 @@ const SalesVoucher: React.FC = () => {
     }
   };
 
+  // Auto-update place of supply from party's state when user selects a party
+  const handlePartySelect = (partyId: number) => {
+    setSelectedPartyId(partyId);
+    const party = parties.find(p => p.id === partyId);
+    if (party?.state) {
+      const stateMatch = indianStates.find(s => s.name === party.state || s.code === party.state);
+      if (stateMatch) setPlaceOfSupply(stateMatch.code);
+    }
+  };
+
   // Get godown state for reference
   const godownStateCode = selectedGodown?.state ?
     indianStates.find(s => s.name === selectedGodown.state || s.code === selectedGodown.state)?.code : null;
@@ -876,9 +886,10 @@ const SalesVoucher: React.FC = () => {
   const partyStateCode = consigneeParty?.state ?
     indianStates.find(s => s.name === consigneeParty.state || s.code === consigneeParty.state)?.code : null;
 
-  // Get company/godown state
-  const companyStateCode = selectedGodown?.state ?
-    indianStates.find(s => s.name === selectedGodown.state || s.code === selectedGodown.state)?.code : null;
+  // Get company state — prefer godown state, fall back to business GST settings
+  const companyStateCode = selectedGodown?.state
+    ? indianStates.find(s => s.name === selectedGodown.state || s.code === selectedGodown.state)?.code
+    : (businessDetails?.from_state_code ? String(businessDetails.from_state_code) : businessDetails?.gstin?.substring(0, 2) || null);
 
   // Calculate total amount from rows
   const totalAmount = rows.reduce((acc, curr) => acc + curr.amount, 0);
@@ -1203,7 +1214,7 @@ const SalesVoucher: React.FC = () => {
               <div className="relative">
                 <select
                   value={selectedPartyId || ''}
-                  onChange={(e) => setSelectedPartyId(parseInt(e.target.value))}
+                  onChange={(e) => handlePartySelect(parseInt(e.target.value))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none appearance-none pr-10"
                 >
                   <option value="">Select Party...</option>
@@ -1318,7 +1329,7 @@ const SalesVoucher: React.FC = () => {
               <div className="relative">
                 <select
                   value={selectedPartyId || ''}
-                  onChange={(e) => setSelectedPartyId(parseInt(e.target.value))}
+                  onChange={(e) => handlePartySelect(parseInt(e.target.value))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none appearance-none pr-10"
                 >
                   <option value="">Select Party...</option>
@@ -1433,7 +1444,7 @@ const SalesVoucher: React.FC = () => {
               <div className="relative">
                 <select
                   value={selectedPartyId || ''}
-                  onChange={(e) => setSelectedPartyId(parseInt(e.target.value))}
+                  onChange={(e) => handlePartySelect(parseInt(e.target.value))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none appearance-none pr-10"
                 >
                   <option value="">Select Party...</option>

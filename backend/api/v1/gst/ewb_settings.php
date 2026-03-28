@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 $user = AuthMiddleware::authenticate();
@@ -48,12 +49,34 @@ function ewbSettingsHasFromStateColumn(PDO $pdo): bool {
 }
 
 try {
-    $pdo    = getDBConnection();
-    $method = $_SERVER['REQUEST_METHOD'];
+    $pdo       = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
+    $method    = $_SERVER['REQUEST_METHOD'];
+
+    // Ensure required columns exist on ewb_settings
+    try {
+        $existingCols = $pdo->prepare("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ewb_settings'");
+        $existingCols->execute();
+        $cols = array_column($existingCols->fetchAll(PDO::FETCH_ASSOC), 'COLUMN_NAME');
+
+        if (!in_array('company_id', $cols)) {
+            $pdo->exec("ALTER TABLE ewb_settings ADD COLUMN company_id INT NULL");
+            $pdo->exec("ALTER TABLE ewb_settings ADD INDEX idx_ewb_company (company_id)");
+        }
+        if (!in_array('email', $cols)) {
+            $pdo->exec("ALTER TABLE ewb_settings ADD COLUMN email VARCHAR(255) NULL");
+        }
+        if (!in_array('phone', $cols)) {
+            $pdo->exec("ALTER TABLE ewb_settings ADD COLUMN phone VARCHAR(50) NULL");
+        }
+    } catch (Exception $e) {
+        error_log('ewb_settings migration error: ' . $e->getMessage());
+    }
 
     // ── GET ──────────────────────────────────────────────────────────────────
     if ($method === 'GET') {
-        $stmt = $pdo->query("SELECT * FROM ewb_settings ORDER BY id DESC LIMIT 1");
+        $stmt = $pdo->prepare("SELECT * FROM ewb_settings WHERE company_id = ? ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$companyId]);
         $row  = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {
@@ -73,7 +96,7 @@ try {
             ApiResponse::error('Invalid JSON data');
         }
 
-        $required = ['gstin', 'username', 'from_trade_name', 'from_addr1', 'from_place', 'from_state', 'from_pincode', 'from_state_code'];
+        $required = ['gstin', 'from_trade_name', 'from_addr1', 'from_place', 'from_state', 'from_pincode', 'from_state_code'];
         $errors   = [];
         foreach ($required as $field) {
             if (!isset($input[$field]) || trim((string)$input[$field]) === '') {
@@ -85,9 +108,11 @@ try {
         }
 
         $gstin          = strtoupper(preg_replace('/[^A-Z0-9]/i', '', trim($input['gstin'])));
-        $username       = trim($input['username']);
+        $username       = trim($input['username'] ?? '');
         $ewbpwdInput    = trim((string)($input['ewbpwd'] ?? ''));
         $fromTradeName  = trim($input['from_trade_name']);
+        $email          = trim($input['email'] ?? '');
+        $phone          = trim($input['phone'] ?? '');
         $fromAddr1      = trim($input['from_addr1']);
         $fromAddr2      = trim($input['from_addr2'] ?? '');
         $fromPlace      = trim($input['from_place']);
@@ -100,17 +125,19 @@ try {
             ApiResponse::validationError(['gstin' => ['Invalid GSTIN format (expected 15-character GSTIN)']]);
         }
 
-        // Check for existing row
-        $stmt    = $pdo->query("SELECT id, ewbpwd FROM ewb_settings ORDER BY id DESC LIMIT 1");
+        // Check for existing row for this company
+        $stmt     = $pdo->prepare("SELECT id, ewbpwd, username FROM ewb_settings WHERE company_id = ? ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$companyId]);
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$existing && $ewbpwdInput === '') {
-            ApiResponse::validationError(['ewbpwd' => ['ewbpwd is required']]);
-        }
 
         $ewbpwd = $ewbpwdInput;
         if ($existing && $ewbpwdInput === '') {
             $ewbpwd = $existing['ewbpwd'];
+        }
+
+        // Preserve existing username if not provided in this request
+        if ($username === '' && $existing && !empty($existing['username'])) {
+            $username = $existing['username'];
         }
 
         if ($existing) {
@@ -122,6 +149,8 @@ try {
                         username        = ?,
                         ewbpwd          = ?,
                         from_trade_name = ?,
+                        email           = ?,
+                        phone           = ?,
                         from_addr1      = ?,
                         from_addr2      = ?,
                         from_place      = ?,
@@ -133,7 +162,8 @@ try {
                 ");
                 $stmt->execute([
                     $gstin, $username, $ewbpwd,
-                    $fromTradeName, $fromAddr1, $fromAddr2,
+                    $fromTradeName, $email ?: null, $phone ?: null,
+                    $fromAddr1, $fromAddr2,
                     $fromPlace, $fromState, $fromPincode, $fromStateCode,
                     $existing['id']
                 ]);
@@ -144,6 +174,8 @@ try {
                         username        = ?,
                         ewbpwd          = ?,
                         from_trade_name = ?,
+                        email           = ?,
+                        phone           = ?,
                         from_addr1      = ?,
                         from_addr2      = ?,
                         from_place      = ?,
@@ -154,7 +186,8 @@ try {
                 ");
                 $stmt->execute([
                     $gstin, $username, $ewbpwd,
-                    $fromTradeName, $fromAddr1, $fromAddr2,
+                    $fromTradeName, $email ?: null, $phone ?: null,
+                    $fromAddr1, $fromAddr2,
                     $fromPlace, $fromPincode, $fromStateCode,
                     $existing['id']
                 ]);
@@ -165,23 +198,27 @@ try {
             if ($hasFromStateColumn) {
                 $stmt = $pdo->prepare("
                     INSERT INTO ewb_settings
-                        (gstin, username, ewbpwd, from_trade_name, from_addr1, from_addr2, from_place, from_state, from_pincode, from_state_code)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (company_id, gstin, username, ewbpwd, from_trade_name, email, phone, from_addr1, from_addr2, from_place, from_state, from_pincode, from_state_code)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
+                    $companyId,
                     $gstin, $username, $ewbpwd,
-                    $fromTradeName, $fromAddr1, $fromAddr2,
+                    $fromTradeName, $email ?: null, $phone ?: null,
+                    $fromAddr1, $fromAddr2,
                     $fromPlace, $fromState, $fromPincode, $fromStateCode
                 ]);
             } else {
                 $stmt = $pdo->prepare("
                     INSERT INTO ewb_settings
-                        (gstin, username, ewbpwd, from_trade_name, from_addr1, from_addr2, from_place, from_pincode, from_state_code)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (company_id, gstin, username, ewbpwd, from_trade_name, email, phone, from_addr1, from_addr2, from_place, from_pincode, from_state_code)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $stmt->execute([
+                    $companyId,
                     $gstin, $username, $ewbpwd,
-                    $fromTradeName, $fromAddr1, $fromAddr2,
+                    $fromTradeName, $email ?: null, $phone ?: null,
+                    $fromAddr1, $fromAddr2,
                     $fromPlace, $fromPincode, $fromStateCode
                 ]);
             }

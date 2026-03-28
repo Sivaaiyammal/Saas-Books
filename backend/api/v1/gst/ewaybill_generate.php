@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
 require_once __DIR__ . '/../../../helpers/ewaybill.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 $user = AuthMiddleware::authenticate();
@@ -125,8 +126,9 @@ function ewbDecodeProviderResponse($response) {
 }
 
 try {
-    $pdo = getDBConnection();
-    $method = $_SERVER['REQUEST_METHOD'];
+    $pdo       = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
+    $method    = $_SERVER['REQUEST_METHOD'];
 
     if ($method === 'GET') {
         $voucherId = $_GET['voucher_id'] ?? null;
@@ -216,7 +218,8 @@ try {
 
         $voucherId = (int)$input['voucher_id'];
 
-        $stmt = $pdo->query("SELECT * FROM ewb_settings ORDER BY id DESC LIMIT 1");
+        $stmt = $pdo->prepare("SELECT * FROM ewb_settings WHERE company_id = ? ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$companyId]);
         $ewbSettings = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$ewbSettings) {
             ApiResponse::error('EWB settings not configured. Save settings first.', 400);

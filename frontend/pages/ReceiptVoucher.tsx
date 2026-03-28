@@ -139,19 +139,20 @@ const ReceiptVoucher: React.FC = () => {
     setNarration(editVoucher.narration || '');
 
     const entries = Array.isArray(editVoucher.entries) ? editVoucher.entries : [];
-    const receivedEntry = entries.find((entry: any) => (
-      entry.dr_cr === 'Dr' && ['Cash-in-Hand', 'Bank Accounts'].includes(entry.group_name)
-    ));
     const tdsEntry = entries.find((entry: any) => (
       entry.dr_cr === 'Dr' && String(entry.description || '').toLowerCase().includes('tds')
+    ));
+    // Cash/Bank entry: the Dr entry that is NOT the TDS entry (description starts with "Receipt from")
+    const receivedEntry = entries.find((entry: any) => (
+      entry.dr_cr === 'Dr' && !String(entry.description || '').toLowerCase().includes('tds')
     ));
 
     if (receivedEntry) {
       setReceivedInId(Number(receivedEntry.ledger_id));
       setAmount(String(parseFloat(receivedEntry.amount || '0')));
     } else {
-      setReceivedInId(editVoucher.received_in ? Number(editVoucher.received_in) : '');
-      setAmount(String(parseFloat(editVoucher.amount_received || editVoucher.amount || editVoucher.total_amount || '0')));
+      setReceivedInId('');
+      setAmount(String(parseFloat(editVoucher.total_amount || '0')));
     }
 
     if (tdsEntry) {
@@ -327,10 +328,12 @@ const ReceiptVoucher: React.FC = () => {
         ? await vouchersApi.updateReceipt(editingVoucherId, payload)
         : await vouchersApi.createReceipt(payload);
       if (res.success) {
-        alert(isEditing ? "Receipt updated successfully!" : "Receipt saved successfully!");
         navigate('/reports/receivables');
       } else {
-        alert(res.message || "Failed to save receipt.");
+        const errorDetails = res.errors
+          ? '\n' + Object.entries(res.errors).map(([k, v]) => `• ${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n')
+          : '';
+        alert((res.message || "Failed to save receipt.") + errorDetails);
       }
     } catch (err: any) {
       alert(err.message || "Network error.");
@@ -361,8 +364,8 @@ const ReceiptVoucher: React.FC = () => {
             <Receipt size={32} />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none uppercase">
-              {isEditing ? 'Edit Receipt Voucher' : 'Receipt (Post Collection)'}
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none ">
+              {isEditing ? 'Edit Receipt Voucher' : 'Receipt Voucher'}
             </h1>
             <div className="flex items-center gap-2 mt-3">
               <span className="px-3 py-1 bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-lg shadow-emerald-200">Financial Inward</span>
@@ -612,7 +615,7 @@ const ReceiptVoucher: React.FC = () => {
         <div className="md:col-span-4 space-y-8">
 
           {/* Statutory (TDS) Configuration */}
-          <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-xl shadow-slate-200/40 space-y-6">
+          {/* <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-xl shadow-slate-200/40 space-y-6">
             <div className="flex items-center justify-between">
                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 border border-amber-100 shadow-sm"><Calculator size={20} /></div>
@@ -657,7 +660,7 @@ const ReceiptVoucher: React.FC = () => {
                  </div>
               </div>
             )}
-          </div>
+          </div> */}
 
           {/* Narrative & High-Contrast Summary */}
           <div className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-2xl relative overflow-hidden group">

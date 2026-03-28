@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, AlertCircle, CheckCircle2, Building2, ShieldCheck, MapPin, FileBadge2 } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle2, Building2, ShieldCheck, MapPin, FileBadge2, Mail, Phone } from 'lucide-react';
 import { settingsApi } from '../services/api';
 
 const Settings: React.FC = () => {
@@ -11,6 +11,8 @@ const Settings: React.FC = () => {
     const [formData, setFormData] = useState({
         from_trade_name: '',
         gstin: '',
+        email: '',
+        phone: '',
         from_addr1: '',
         from_addr2: '',
         from_place: '',
@@ -72,8 +74,8 @@ const Settings: React.FC = () => {
             } else {
                 setMessage({ type: 'error', text: response.message || 'Failed to save settings.' });
             }
-        } catch (error) {
-            setMessage({ type: 'error', text: 'An error occurred while saving settings.' });
+        } catch (error: any) {
+            setMessage({ type: 'error', text: error?.message || 'An error occurred while saving settings.' });
         } finally {
             setLoading(false);
         }
@@ -146,6 +148,36 @@ const Settings: React.FC = () => {
                                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all"
                                     placeholder="Enter GSTIN"
                                 />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email</label>
+                                <div className="relative">
+                                    <Mail size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                    <input
+                                        type="email"
+                                        name="email"
+                                        value={formData.email}
+                                        onChange={handleChange}
+                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all"
+                                        placeholder="company@example.com"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Phone</label>
+                                <div className="relative">
+                                    <Phone size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                    <input
+                                        type="text"
+                                        name="phone"
+                                        value={formData.phone}
+                                        onChange={handleChange}
+                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all"
+                                        placeholder="+91 98765 43210"
+                                    />
+                                </div>
                             </div>
 
                             <div className="space-y-2">

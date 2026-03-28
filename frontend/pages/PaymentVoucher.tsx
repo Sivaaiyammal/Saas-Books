@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Save,
   X,
@@ -37,6 +37,9 @@ interface BillAllocation {
 
 const PaymentVoucher: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const editVoucher = (location.state as { editVoucher?: any } | null)?.editVoucher;
+  const hasHydratedEditRef = useRef(false);
 
   // Master Data
   const [parties, setParties] = useState<any[]>([]);
@@ -49,6 +52,8 @@ const PaymentVoucher: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingVoucherId, setEditingVoucherId] = useState<number | null>(null);
 
   const [partyId, setPartyId] = useState<number | ''>('');
   const [voucherDate, setVoucherDate] = useState(new Date().toISOString().split('T')[0]);
@@ -67,6 +72,8 @@ const PaymentVoucher: React.FC = () => {
   const [isAllocationModalOpen, setIsAllocationModalOpen] = useState(false);
   const [isFetchingBills, setIsFetchingBills] = useState(false);
   const [paymentMode, setPaymentMode] = useState<'adjustable' | 'on_account' | 'advance'>('on_account');
+  const prefilledBillAllocationsRef = useRef<Record<string, number>>({});
+  const prefilledBillDetailsRef = useRef<{ invoice_no: string; voucher_date: string; allocated_amount: number }[]>([]);
 
   // Computed: Selected Party details
   const selectedParty = useMemo(() => {
@@ -111,6 +118,85 @@ const PaymentVoucher: React.FC = () => {
     fetchData();
   }, []);
 
+  // Hydrate form when editing an existing payment
+  useEffect(() => {
+    if (!editVoucher || isLoading || hasHydratedEditRef.current) {
+      return;
+    }
+
+    hasHydratedEditRef.current = true;
+    setIsEditing(true);
+    setEditingVoucherId(editVoucher.id ?? null);
+    setPartyId(editVoucher.party_ledger_id ? Number(editVoucher.party_ledger_id) : '');
+    setVoucherDate(editVoucher.voucher_date ? String(editVoucher.voucher_date).split('T')[0] : new Date().toISOString().split('T')[0]);
+    setReferenceNo(editVoucher.reference_no || '');
+    setNarration(editVoucher.narration || '');
+
+    const entries = Array.isArray(editVoucher.entries) ? editVoucher.entries : [];
+
+    // Cr entry for Cash/Bank (group = Cash-in-Hand or Bank Accounts)
+    const paidFromEntry = entries.find((entry: any) =>
+      entry.dr_cr === 'Cr' &&
+      (String(entry.group_name || '').toLowerCase().includes('bank') ||
+       String(entry.group_name || '').toLowerCase().includes('cash'))
+    );
+
+    // Cr entry for TDS (group contains 'tds' or 'tax deducted')
+    const tdsEntry = entries.find((entry: any) =>
+      entry.dr_cr === 'Cr' &&
+      (String(entry.group_name || '').toLowerCase().includes('tds') ||
+       String(entry.ledger_name || '').toLowerCase().includes('tds'))
+    );
+
+    if (paidFromEntry) {
+      setPaidFromId(Number(paidFromEntry.ledger_id));
+      setAmount(String(parseFloat(paidFromEntry.amount || '0')));
+    } else {
+      setPaidFromId('');
+      setAmount(String(parseFloat(editVoucher.total_amount || '0')));
+    }
+
+    if (tdsEntry) {
+      setHasTds(true);
+      setTdsAmount(String(parseFloat(tdsEntry.amount || '0')));
+      setTdsLedgerId(Number(tdsEntry.ledger_id));
+    } else {
+      setHasTds(false);
+      setTdsAmount('');
+      setTdsLedgerId('');
+    }
+
+    const billAdjustmentsFromEdit = Array.isArray(editVoucher.bill_adjustments) ? editVoucher.bill_adjustments : [];
+    const againstAdjustments = billAdjustmentsFromEdit.filter((adj: any) =>
+      String(adj.type || '').toLowerCase() === 'against' && adj.bill_no
+    );
+
+    const rawMode = String(editVoucher.payment_mode || '').toLowerCase().replace(/\s+/g, '_');
+    const resolvedMode: 'adjustable' | 'on_account' | 'advance' =
+      rawMode === 'adjustable' ? 'adjustable'
+      : rawMode === 'advance' ? 'advance'
+      : rawMode === 'on_account' ? 'on_account'
+      : againstAdjustments.length > 0 ? 'adjustable'
+      : 'on_account';
+
+    setPaymentMode(resolvedMode);
+
+    if (resolvedMode === 'adjustable' && againstAdjustments.length > 0) {
+      const allocMap: Record<string, number> = {};
+      againstAdjustments.forEach((adj: any) => {
+        const billNo = String(adj.bill_no || '');
+        if (billNo) allocMap[billNo] = parseFloat(adj.amount || '0');
+      });
+      const details = againstAdjustments.map((adj: any) => ({
+        invoice_no: String(adj.bill_no || ''),
+        voucher_date: String(adj.bill_date || editVoucher.voucher_date || '').split('T')[0],
+        allocated_amount: parseFloat(adj.amount || '0'),
+      })).filter((d: any) => d.invoice_no);
+      prefilledBillAllocationsRef.current = allocMap;
+      prefilledBillDetailsRef.current = details;
+    }
+  }, [editVoucher, isLoading]);
+
   // Fetch Pending Invoices and Outstanding when Party changes
   useEffect(() => {
     if (partyId) {
@@ -125,18 +211,38 @@ const PaymentVoucher: React.FC = () => {
               count: billCount
             });
 
-            if (res.data.bills && res.data.bills.length > 0) {
-              setPendingInvoices(res.data.bills.map((bill: any) => ({
+            const currentPrefilled = prefilledBillAllocationsRef.current;
+            const currentPrefilledDetails = prefilledBillDetailsRef.current;
+            const freshBills: any[] = res.data.bills || [];
+
+            const mappedBills = freshBills.map((bill: any) => {
+              const invoiceNo = bill.bill_no || bill.voucher_no;
+              const prefilledAmount = currentPrefilled[invoiceNo] || 0;
+              const availablePending = parseFloat(bill.pending_amount || '0') + prefilledAmount;
+              return {
                 id: bill.allocation_id,
-                invoice_no: bill.bill_no || bill.voucher_no,
+                invoice_no: invoiceNo,
                 voucher_date: bill.bill_date || bill.voucher_date,
-                pending_amount: parseFloat(bill.pending_amount || '0'),
-                allocated_amount: 0,
-                selected: false
-              })));
-            } else {
-              setPendingInvoices([]);
-            }
+                pending_amount: availablePending,
+                allocated_amount: prefilledAmount > 0 ? prefilledAmount : 0,
+                selected: prefilledAmount > 0,
+              };
+            });
+
+            // Add bills that no longer appear in outstanding (already fully settled by this payment)
+            const missingBills = currentPrefilledDetails
+              .filter(pd => !mappedBills.some((b: any) => b.invoice_no === pd.invoice_no))
+              .map((pd, idx) => ({
+                id: -(idx + 1),
+                invoice_no: pd.invoice_no,
+                voucher_date: pd.voucher_date,
+                pending_amount: pd.allocated_amount,
+                allocated_amount: pd.allocated_amount,
+                selected: true,
+              }));
+
+            const combined = [...mappedBills, ...missingBills];
+            setPendingInvoices(combined);
           }
         } catch (err) {
           console.warn("Could not load bills for this vendor:", err);
@@ -191,7 +297,7 @@ const PaymentVoucher: React.FC = () => {
       payload.bill_adjustments = pendingInvoices
         .filter(i => i.selected)
         .map(i => ({
-          allocation_id: i.id,
+          ...(i.id > 0 ? { allocation_id: i.id } : {}),
           bill_no: i.invoice_no,
           amount: i.allocated_amount
         }));
@@ -199,9 +305,10 @@ const PaymentVoucher: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const res = await vouchersApi.createPayment(payload);
+      const res = isEditing && editingVoucherId
+        ? await vouchersApi.updatePayment(editingVoucherId, payload)
+        : await vouchersApi.createPayment(payload);
       if (res.success) {
-        alert("Payment saved successfully!");
         navigate('/reports/payables');
       } else {
         alert(res.message || "Failed to save payment.");
@@ -235,9 +342,16 @@ const PaymentVoucher: React.FC = () => {
             <Banknote size={32} />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none uppercase">Payment (Post Payment)</h1>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none ">
+              {isEditing ? 'Edit Payment Voucher' : 'Payment Voucher'}
+            </h1>
             <div className="flex items-center gap-2 mt-3">
               <span className="px-3 py-1 bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-lg shadow-amber-200">Financial Outward</span>
+              {isEditing && editingVoucherId && (
+                <span className="px-3 py-1 bg-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-widest rounded-lg border border-amber-200">
+                  Editing #{editingVoucherId}
+                </span>
+              )}
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 ml-2">
                  <ShieldCheck size={12} className="text-amber-500" /> Audit Verified Terminal
               </span>
@@ -471,7 +585,7 @@ const PaymentVoucher: React.FC = () => {
         <div className="md:col-span-4 space-y-8">
 
           {/* Statutory (TDS) Configuration */}
-          <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-xl shadow-slate-200/40 space-y-6">
+          {/* <div className="bg-white p-8 rounded-[3rem] border border-slate-200 shadow-xl shadow-slate-200/40 space-y-6">
             <div className="flex items-center justify-between">
                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600 border border-rose-100 shadow-sm"><Calculator size={20} /></div>
@@ -516,7 +630,7 @@ const PaymentVoucher: React.FC = () => {
                  </div>
               </div>
             )}
-          </div>
+          </div> */}
 
           {/* Narration & High-Contrast Summary */}
           <div className="bg-slate-900 p-8 rounded-[3rem] text-white shadow-2xl relative overflow-hidden group">

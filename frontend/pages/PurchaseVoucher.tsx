@@ -493,15 +493,51 @@ const PurchaseVoucher: React.FC = () => {
     }
   };
 
+  // Auto-update place of supply from supplier's state when user selects a party
+  const handlePartySelect = (partyId: number) => {
+    setSelectedPartyId(partyId);
+    const party = parties.find(p => p.id === partyId);
+    if (party?.state) {
+      const stateMatch = indianStates.find(s => s.name === party.state || s.code === party.state);
+      if (stateMatch) setPlaceOfSupply(stateMatch.code);
+    }
+  };
+
   const totalAmount = rows.reduce((acc, curr) => acc + curr.amount, 0);
-  const totalGstAmount = rows.reduce((acc, curr) => acc + (curr.amount * (curr.gst / 100)), 0);
-  const totalCgstSgstAmount = totalGstAmount / 2;
+
+  // Get company state — prefer godown state, fall back to business GST settings
+  const godownStateCode = selectedGodown?.state
+    ? indianStates.find(s => s.name === selectedGodown.state || s.code === selectedGodown.state)?.code
+    : (businessDetails?.from_state_code ? String(businessDetails.from_state_code) : businessDetails?.gstin?.substring(0, 2) || null);
 
   // Determine if inter-state (IGST) or intra-state (CGST+SGST)
-  // Compare godown state with place of supply
-  const godownStateCode = selectedGodown?.state ?
-    indianStates.find(s => s.name === selectedGodown.state || s.code === selectedGodown.state)?.code : null;
+  // placeOfSupply is auto-set to supplier's state when party changes
   const isInterState = godownStateCode !== placeOfSupply;
+
+  // Calculate taxes based on inter-state flag
+  let totalCgst = 0;
+  let totalSgst = 0;
+  let totalIgst = 0;
+  let totalTax = 0;
+
+  rows.forEach(row => {
+    const taxableAmount = row.amount;
+    const taxPercent = row.gst;
+    if (!isInterState) {
+      const cgst = (taxableAmount * (taxPercent / 2)) / 100;
+      const sgst = (taxableAmount * (taxPercent / 2)) / 100;
+      totalCgst += cgst;
+      totalSgst += sgst;
+      totalTax += cgst + sgst;
+    } else {
+      const igst = (taxableAmount * taxPercent) / 100;
+      totalIgst += igst;
+      totalTax += igst;
+    }
+  });
+
+  const totalGstAmount = totalTax;
+  const totalCgstSgstAmount = totalCgst;
 
   const subTotal = totalAmount + (isGSTInvoice ? totalGstAmount : 0);
   const roundedTotal = Math.round(subTotal);
@@ -792,7 +828,7 @@ const PurchaseVoucher: React.FC = () => {
               <div className="relative">
                 <select
                   value={selectedPartyId || ''}
-                  onChange={(e) => setSelectedPartyId(parseInt(e.target.value))}
+                  onChange={(e) => handlePartySelect(parseInt(e.target.value))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none appearance-none pr-10"
                 >
                   <option value="">Select Party...</option>
@@ -907,7 +943,7 @@ const PurchaseVoucher: React.FC = () => {
               <div className="relative">
                 <select
                   value={selectedPartyId || ''}
-                  onChange={(e) => setSelectedPartyId(parseInt(e.target.value))}
+                  onChange={(e) => handlePartySelect(parseInt(e.target.value))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none appearance-none pr-10"
                 >
                   <option value="">Select Party...</option>
@@ -1022,7 +1058,7 @@ const PurchaseVoucher: React.FC = () => {
               <div className="relative">
                 <select
                   value={selectedPartyId || ''}
-                  onChange={(e) => setSelectedPartyId(parseInt(e.target.value))}
+                  onChange={(e) => handlePartySelect(parseInt(e.target.value))}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none appearance-none pr-10"
                 >
                   <option value="">Select Party...</option>
@@ -1502,18 +1538,18 @@ const PurchaseVoucher: React.FC = () => {
                     {isGSTInvoice && (
                       isInterState ? (
                         <div className="flex justify-between text-[11px] font-bold text-amber-400">
-                          <span>IGST</span>
-                          <span>₹{totalGstAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span>IGST ({rows[0]?.gst}%)</span>
+                          <span>₹{totalIgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                       ) : (
                         <>
                           <div className="flex justify-between text-[11px] font-bold text-indigo-400">
-                            <span>CGST</span>
-                            <span>₹{totalCgstSgstAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span>CGST ({rows[0]?.gst ? (rows[0].gst / 2).toFixed(1) : 0}%)</span>
+                            <span>₹{totalCgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
                           <div className="flex justify-between text-[11px] font-bold text-indigo-400">
-                            <span>SGST</span>
-                            <span>₹{totalCgstSgstAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span>SGST ({rows[0]?.gst ? (rows[0].gst / 2).toFixed(1) : 0}%)</span>
+                            <span>₹{totalSgst.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                           </div>
                         </>
                       )

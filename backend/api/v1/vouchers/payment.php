@@ -520,6 +520,229 @@ try {
         }
     }
 
+    // PUT: Update payment
+    if ($method === 'PUT') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            ApiResponse::error('Invalid JSON data');
+        }
+
+        if (!isset($input['id'])) {
+            ApiResponse::error('Payment ID is required');
+        }
+
+        $id = (int)$input['id'];
+
+        $stmt = $pdo->prepare("SELECT * FROM vouchers WHERE id = ? AND voucher_type = 'Payment' AND company_id = ?");
+        $stmt->execute([$id, $companyId]);
+        $existing = $stmt->fetch();
+
+        if (!$existing) {
+            ApiResponse::error('Payment not found', 404);
+        }
+
+        if ($existing['status'] === 'cancelled') {
+            ApiResponse::error('Cancelled payments cannot be edited', 400);
+        }
+
+        $errors = [];
+        if (empty($input['party_ledger_id'])) $errors['party_ledger_id'] = ['Vendor ledger is required'];
+        if (empty($input['amount']) || $input['amount'] <= 0) $errors['amount'] = ['Valid amount is required'];
+        if (empty($input['paid_from'])) $errors['paid_from'] = ['Cash/Bank ledger is required'];
+        if (!empty($errors)) ApiResponse::validationError($errors);
+
+        $stmt = $pdo->prepare("
+            SELECT l.id, l.name, g.name as group_name
+            FROM ledgers l INNER JOIN `groups` g ON l.group_id = g.id
+            WHERE l.id = ? AND (
+                g.name = 'Sundry Creditors' OR g.name LIKE 'Sundry Creditors%'
+                OR g.name = 'Sundry Debtors' OR g.name LIKE 'Sundry Debtors%'
+            )
+        ");
+        $stmt->execute([$input['party_ledger_id']]);
+        $partyLedger = $stmt->fetch();
+        if (!$partyLedger) ApiResponse::validationError(['party_ledger_id' => ['Invalid ledger']]);
+
+        $stmt = $pdo->prepare("
+            SELECT l.id, l.name, g.name as group_name
+            FROM ledgers l INNER JOIN `groups` g ON l.group_id = g.id
+            WHERE l.id = ? AND g.name IN ('Cash-in-Hand', 'Bank Accounts', 'Bank OD A/c')
+        ");
+        $stmt->execute([$input['paid_from']]);
+        $cashBankLedger = $stmt->fetch();
+        if (!$cashBankLedger) ApiResponse::validationError(['paid_from' => ['Invalid Cash/Bank ledger']]);
+
+        $amount = (float)$input['amount'];
+        $tdsAmount = isset($input['tds_amount']) ? (float)$input['tds_amount'] : 0;
+        $discountAmount = isset($input['discount_amount']) ? (float)$input['discount_amount'] : 0;
+        $totalSettled = $amount + $tdsAmount + $discountAmount;
+        $paymentMode = $normalizePaymentMode($input['payment_mode'] ?? 'on_account');
+        $billAdjustments = $input['bill_adjustments'] ?? [];
+
+        if ($paymentMode === 'Adjustable' && empty($billAdjustments)) {
+            ApiResponse::validationError(['bill_adjustments' => ['Select at least one bill in Adjustable mode']]);
+        }
+
+        // Fetch current bill adjustments to calculate effective pending on edit
+        $currentBillAdjStmt = $pdo->prepare("
+            SELECT ba.bill_no, COALESCE(SUM(ba.amount), 0) as current_allocated
+            FROM bill_allocations ba
+            INNER JOIN voucher_entries ve ON ba.voucher_entry_id = ve.id
+            WHERE ve.voucher_id = ? AND ba.type = 'Against'
+            GROUP BY ba.bill_no
+        ");
+        $currentBillAdjStmt->execute([$id]);
+        $currentBillAdjustments = [];
+        foreach ($currentBillAdjStmt->fetchAll() as $row) {
+            $currentBillAdjustments[$row['bill_no']] = (float)$row['current_allocated'];
+        }
+
+        foreach ($billAdjustments as $idx => $adj) {
+            $adjAmount = (float)($adj['amount'] ?? 0);
+            $allocationId = (int)($adj['allocation_id'] ?? 0);
+            $billNo = trim((string)($adj['bill_no'] ?? ''));
+            if (($allocationId <= 0 && $billNo === '') || $adjAmount <= 0) {
+                ApiResponse::validationError(["bill_adjustments.$idx" => ['allocation_id or bill_no and valid amount are required']]);
+            }
+            if ($allocationId > 0) {
+                $stmt = $pdo->prepare("
+                    SELECT ba.id, ba.bill_no, ba.pending_amount
+                    FROM bill_allocations ba
+                    INNER JOIN voucher_entries ve ON ba.voucher_entry_id = ve.id
+                    INNER JOIN vouchers v ON ve.voucher_id = v.id
+                    WHERE ba.id = ? AND ba.ledger_id = ? AND ba.type IN ('New','Opening')
+                    AND (v.voucher_type = 'Purchase' OR ba.type = 'Opening') AND v.company_id = ?
+                ");
+                $stmt->execute([$allocationId, $input['party_ledger_id'], $companyId]);
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT ba.id, ba.bill_no, ba.pending_amount
+                    FROM bill_allocations ba
+                    INNER JOIN voucher_entries ve ON ba.voucher_entry_id = ve.id
+                    INNER JOIN vouchers v ON ve.voucher_id = v.id
+                    WHERE ba.bill_no = ? AND ba.ledger_id = ? AND ba.type IN ('New','Opening')
+                    AND (v.voucher_type = 'Purchase' OR ba.type = 'Opening') AND v.company_id = ?
+                    ORDER BY ba.id DESC LIMIT 1
+                ");
+                $stmt->execute([$billNo, $input['party_ledger_id'], $companyId]);
+            }
+            $allocation = $stmt->fetch();
+            if (!$allocation) {
+                ApiResponse::validationError(["bill_adjustments.$idx" => ['Invalid bill allocation']]);
+            }
+            $effectivePending = (float)$allocation['pending_amount'] + ($currentBillAdjustments[$allocation['bill_no']] ?? 0);
+            if ($adjAmount > $effectivePending + 0.01) {
+                ApiResponse::validationError(["bill_adjustments.$idx" => ["Amount exceeds pending ({$effectivePending})"]]);
+            }
+        }
+
+        $pdo->beginTransaction();
+        try {
+            // Restore pending amounts for existing 'Against' allocations
+            $stmt = $pdo->prepare("
+                SELECT ba.*, ve.ledger_id
+                FROM bill_allocations ba
+                INNER JOIN voucher_entries ve ON ba.voucher_entry_id = ve.id
+                WHERE ve.voucher_id = ? AND ba.type = 'Against'
+            ");
+            $stmt->execute([$id]);
+            foreach ($stmt->fetchAll() as $adj) {
+                $pdo->prepare("
+                    UPDATE bill_allocations SET pending_amount = pending_amount + ?
+                    WHERE ledger_id = ? AND bill_no = ? AND type = 'New'
+                ")->execute([$adj['amount'], $adj['ledger_id'], $adj['bill_no']]);
+            }
+
+            // Delete old bill allocations and entries
+            $pdo->prepare("DELETE ba FROM bill_allocations ba INNER JOIN voucher_entries ve ON ba.voucher_entry_id = ve.id WHERE ve.voucher_id = ?")->execute([$id]);
+            $pdo->prepare("DELETE FROM voucher_entries WHERE voucher_id = ?")->execute([$id]);
+
+            // Update voucher header
+            $pdo->prepare("
+                UPDATE vouchers SET
+                    voucher_date = ?, reference_no = ?, party_ledger_id = ?,
+                    total_amount = ?, narration = ?, payment_mode = ?, status = 'posted'
+                WHERE id = ? AND company_id = ?
+            ")->execute([
+                $input['voucher_date'] ?? $existing['voucher_date'],
+                $input['reference_no'] ?? null,
+                $input['party_ledger_id'],
+                $totalSettled,
+                $input['narration'] ?? null,
+                $paymentMode,
+                $id, $companyId
+            ]);
+
+            $stmtEntry = $pdo->prepare("INSERT INTO voucher_entries (voucher_id, ledger_id, dr_cr, amount) VALUES (?, ?, ?, ?)");
+
+            // Dr: Vendor Account
+            $stmtEntry->execute([$id, $input['party_ledger_id'], 'Dr', $totalSettled]);
+            $vendorEntryId = $pdo->lastInsertId();
+
+            // Cr: Cash/Bank
+            $stmtEntry->execute([$id, $input['paid_from'], 'Cr', $amount]);
+
+            // Cr: TDS (if any)
+            if ($tdsAmount > 0 && !empty($input['tds_ledger_id'])) {
+                $stmtEntry->execute([$id, (int)$input['tds_ledger_id'], 'Cr', $tdsAmount]);
+            }
+
+            // Cr: Discount (if any)
+            if ($discountAmount > 0 && !empty($input['discount_ledger_id'])) {
+                $stmtEntry->execute([$id, (int)$input['discount_ledger_id'], 'Cr', $discountAmount]);
+            }
+
+            // Bill adjustments
+            if (!empty($billAdjustments)) {
+                foreach ($billAdjustments as $adj) {
+                    $adjAmount = (float)$adj['amount'];
+                    $adjAllocationId = (int)($adj['allocation_id'] ?? 0);
+                    $adjBillNo = trim((string)($adj['bill_no'] ?? ''));
+
+                    if ($adjAllocationId > 0) {
+                        $stmt = $pdo->prepare("SELECT ba.id, ve.voucher_id as original_voucher_id, ba.bill_no FROM bill_allocations ba INNER JOIN voucher_entries ve ON ba.voucher_entry_id = ve.id WHERE ba.id = ?");
+                        $stmt->execute([$adjAllocationId]);
+                    } else {
+                        $stmt = $pdo->prepare("SELECT ba.id, ve.voucher_id as original_voucher_id, ba.bill_no FROM bill_allocations ba INNER JOIN voucher_entries ve ON ba.voucher_entry_id = ve.id INNER JOIN vouchers v ON ve.voucher_id = v.id WHERE ba.bill_no = ? AND ba.ledger_id = ? AND ba.type IN ('New','Opening') AND v.company_id = ? ORDER BY ba.id DESC LIMIT 1");
+                        $stmt->execute([$adjBillNo, $input['party_ledger_id'], $companyId]);
+                    }
+                    $originalBill = $stmt->fetch();
+
+                    $pdo->prepare("UPDATE bill_allocations SET pending_amount = pending_amount - ? WHERE id = ?")->execute([$adjAmount, $originalBill['id']]);
+
+                    VoucherHelper::createBillAllocation($pdo, [
+                        'ledger_id' => $input['party_ledger_id'],
+                        'voucher_entry_id' => $vendorEntryId,
+                        'bill_no' => $originalBill['bill_no'],
+                        'bill_date' => $input['voucher_date'] ?? $existing['voucher_date'],
+                        'amount' => $adjAmount,
+                        'type' => 'Against',
+                        'pending_amount' => 0,
+                        'reference_voucher_id' => $originalBill['original_voucher_id']
+                    ]);
+                }
+            } else {
+                $onAccountAmount = $totalSettled;
+                $residualType = ($paymentMode === 'Advance') ? 'Advance' : 'On Account';
+                VoucherHelper::createBillAllocation($pdo, [
+                    'ledger_id' => $input['party_ledger_id'],
+                    'voucher_entry_id' => $vendorEntryId,
+                    'bill_no' => $existing['voucher_no'],
+                    'bill_date' => $input['voucher_date'] ?? $existing['voucher_date'],
+                    'amount' => $onAccountAmount,
+                    'type' => $residualType,
+                    'pending_amount' => $onAccountAmount
+                ]);
+            }
+
+            $pdo->commit();
+            ApiResponse::success(['id' => $id], 'Payment updated successfully');
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
+
     // DELETE: Cancel payment
     if ($method === 'DELETE') {
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;

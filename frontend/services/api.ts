@@ -262,7 +262,7 @@ export const apiClient = async (endpoint: string, options: RequestInit = {}, _is
 
     // Get response text first to handle non-JSON errors
     const responseText = await response.text();
-    let data;
+    let data: any;
     try {
       data = responseText ? JSON.parse(responseText) : {};
     } catch (e) {
@@ -777,7 +777,7 @@ export const vouchersApi = {
     });
   },
   // Receipt API
-  async createReceipt(data: ReceiptRequest): Promise<{ success: boolean; message: string; data?: any }> {
+  async createReceipt(data: ReceiptRequest): Promise<{ success: boolean; message: string; data?: any; errors?: Record<string, string[]> }> {
     return apiClient('/vouchers/receipt.php', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -786,10 +786,10 @@ export const vouchersApi = {
   async getReceipts(): Promise<{ success: boolean; data: { receipts: any[] } }> {
     return apiClient('/vouchers/receipt.php');
   },
-  async getReceipt(id: number): Promise<{ success: boolean; data: any }> {
+  async getReceipt(id: number): Promise<{ success: boolean; message?: string; data: any }> {
     return apiClient(`/vouchers/receipt.php?id=${id}`);
   },
-  async updateReceipt(id: number, data: ReceiptRequest): Promise<{ success: boolean; message: string; data?: any }> {
+  async updateReceipt(id: number, data: ReceiptRequest): Promise<{ success: boolean; message: string; data?: any; errors?: Record<string, string[]> }> {
     return apiClient(`/vouchers/receipt.php?id=${id}`, {
       method: 'PUT',
       body: JSON.stringify({ id, ...data }),
@@ -826,6 +826,12 @@ export const vouchersApi = {
   },
   async getPayment(id: number): Promise<{ success: boolean; data: any }> {
     return apiClient(`/vouchers/payment.php?id=${id}`);
+  },
+  async updatePayment(id: number, data: any): Promise<{ success: boolean; message: string; data?: any }> {
+    return apiClient(`/vouchers/payment.php?id=${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ id, ...data }),
+    });
   },
   async deletePayment(id: number): Promise<{ success: boolean; message: string }> {
     return apiClient('/vouchers/payment.php', {

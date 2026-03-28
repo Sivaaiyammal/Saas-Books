@@ -48,8 +48,14 @@ try {
         }
 
         // Build WHERE clause for items
-        $where = ["i.status = 'active'", "i.track_inventory = 1"];
+        $companyId = $user['company_id'] ?? null;
+        $where = ["i.status != 'inactive'", "(i.track_inventory IS NULL OR i.track_inventory = 1)"];
         $params = [];
+
+        if ($companyId) {
+            $where[] = "i.company_id = ?";
+            $params[] = (int)$companyId;
+        }
 
         if ($item_group_id) {
             $where[] = "i.item_group_id = ?";
@@ -382,6 +388,9 @@ function getItemStockSummary($pdo, $itemId, $fromDate = null, $toDate = null) {
         $dateParams[] = $toDate;
     }
 
+    // Get item company_id for scoping the voucher JOIN
+    $itemCompanyId = $item['company_id'] ?? null;
+
     // Get all stock movements for this item
     $transStmt = $pdo->prepare("
         SELECT
@@ -402,13 +411,14 @@ function getItemStockSummary($pdo, $itemId, $fromDate = null, $toDate = null) {
                 ELSE 'OTHER'
             END as stock_effect
         FROM stock_movement sm
-        LEFT JOIN vouchers v ON sm.reference = v.voucher_no
+        LEFT JOIN vouchers v ON sm.reference = v.voucher_no AND v.company_id = ?
         LEFT JOIN ledgers l ON v.party_ledger_id = l.id
         LEFT JOIN stock_conversions sc ON sm.reference = sc.voucher_no
         WHERE sm.product_id = ?
         $dateFilter
         ORDER BY sm.created_at ASC, sm.id ASC
     ");
+    array_unshift($dateParams, $itemCompanyId);
     $transStmt->execute($dateParams);
     $transactions = $transStmt->fetchAll();
 

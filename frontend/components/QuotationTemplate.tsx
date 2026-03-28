@@ -123,21 +123,22 @@ const QuotationTemplate = forwardRef<HTMLDivElement, QuotationTemplateProps>(
         }
 
         const CompanyHeader = () => {
-            const { from_trade_name, from_addr1, from_addr2, from_place, from_pincode, gstin, mobile } = businessDetails || {};
+            const { from_trade_name, from_addr1, from_addr2, from_place, from_pincode, from_state, from_state_code, gstin, email, phone } = businessDetails || {};
             return (
                 <div className="flex border-b-2 border-slate-900 min-h-[140px]">
                     <div className="flex-1 p-2 border-r-2 border-slate-900">
                         <div className="text-xl font-black uppercase tracking-tighter mb-2">{from_trade_name || 'Saas Books'}</div>
                         <div className="space-y-1 text-black">
-                            <p className="text-sm">{from_addr1}, {from_addr2}</p>
+                            <p className="text-sm">{from_addr1}{from_addr2 ? `, ${from_addr2}` : ''}</p>
                             <p className="text-sm">{from_place} - {from_pincode}</p>
-                            <p className="mt-3 text-sm font-normal">State: <span className="text-sm tracking-tight uppercase">Tamilnadu</span> &nbsp;&nbsp; Code: <span className="text-black">33</span></p>
+                            {email && <p className="mt-3 text-sm font-normal">Email: <span className="font-black text-black">{email}</span></p>}
+                            <p className="mt-3 text-sm font-normal">State: <span className="text-sm tracking-tight uppercase">{from_state || 'Tamilnadu'}</span> &nbsp;&nbsp; Code: <span className="text-black">{from_state_code || '33'}</span></p>
                         </div>
                     </div>
                     <div className="w-[300px] p-2 bg-slate-50/50">
                         <div className="space-y-6">
-                            <div><p className="text-sm mb-1">Mobile No : <span className=" text-sm">+91 {mobile || '99948 60932'}</span></p></div>
-                            <div><p className="text-sm mb-1">GST No : <span className=" text-sm">{gstin || '33EWLPS7428M1ZP'}</span></p></div>
+                            {phone && <div><p className="text-sm mb-1">Mobile No : <span className="text-sm">{phone}</span></p></div>}
+                            <div><p className="text-sm mb-1">GST No : <span className=" text-sm">{gstin || '-'}</span></p></div>
                         </div>
                     </div>
                 </div>

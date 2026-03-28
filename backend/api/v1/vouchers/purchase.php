@@ -369,7 +369,7 @@ try {
                     company_id, voucher_type, voucher_no, voucher_date, reference_no,
                     financial_year_id, financial_year,
                     party_ledger_id, total_amount, narration, status, created_by
-                ) VALUES (?, 'Purchase', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, 'Purchase', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             $stmt->execute([
