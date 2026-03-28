@@ -75,7 +75,7 @@ try {
                     oi.ordered_qty, oi.billed_qty, oi.delivered_qty, oi.pending_qty,
                     oi.rate, oi.discount_percent, oi.discount_amount,
                     oi.tax_id, oi.tax_percent, oi.tax_amount, oi.amount,
-                    oi.godown_id, oi.description, oi.status,
+                    oi.description, oi.status,
                     un.name   as unit_name,   un.symbol as unit_symbol,
                     i.item_code, i.hsn_code
                 FROM order_items oi
@@ -127,13 +127,11 @@ try {
                     oi.*,
                     i.item_code, i.hsn_code,
                     un.name   as unit_name,   un.symbol as unit_symbol,
-                    t.name    as tax_name,    t.rate    as tax_rate,
-                    g.name    as godown_name
+                    t.name    as tax_name,    t.rate    as tax_rate
                 FROM order_items oi
                 LEFT JOIN items    i  ON oi.item_id  = i.id
                 LEFT JOIN units    un ON oi.unit_id   = un.id
                 LEFT JOIN taxes    t  ON oi.tax_id    = t.id
-                LEFT JOIN godowns  g  ON oi.godown_id = g.id
                 WHERE oi.order_id = ?
                 ORDER BY oi.id ASC
             ");
@@ -345,8 +343,8 @@ try {
                     order_id, item_id, item_name, unit_id,
                     ordered_qty, billed_qty, delivered_qty, pending_qty, rate,
                     discount_percent, discount_amount, tax_id, tax_percent, tax_amount,
-                    amount, godown_id, description, status
-                ) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
+                    amount, description, status
+                ) VALUES (?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending')
             ");
 
             foreach ($input['items'] as $item) {
@@ -379,7 +377,6 @@ try {
                     $taxPercent,
                     $taxAmount,
                     $amount,
-                    $item['godown_id'] ?? null,
                     $item['description'] ?? null,
                 ]);
             }
@@ -462,7 +459,7 @@ try {
                         order_id, item_id, item_name, unit_id,
                         ordered_qty, billed_qty, delivered_qty, pending_qty, rate,
                         discount_percent, discount_amount, tax_id, tax_percent, tax_amount,
-                        amount, godown_id, description, status
+                        amount, description, status
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
 
@@ -508,7 +505,6 @@ try {
                         $taxPercent,
                         $taxAmount,
                         $amount,
-                        $item['godown_id']   ?? null,
                         $item['description'] ?? null,
                         $itemStatus,
                     ]);

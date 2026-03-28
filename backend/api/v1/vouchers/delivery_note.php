@@ -72,12 +72,10 @@ try {
                 SELECT vi.*,
                        i.item_code, i.hsn_code,
                        un.name   as unit_name, un.symbol as unit_symbol,
-                       g.name    as godown_name,
                        oi.ordered_qty, oi.billed_qty, oi.delivered_qty, oi.pending_qty
                 FROM voucher_items vi
                 LEFT JOIN items    i  ON vi.product_id    = i.id
                 LEFT JOIN units    un ON vi.unit_id        = un.id
-                LEFT JOIN godowns  g  ON vi.godown_id      = g.id
                 LEFT JOIN order_items oi ON vi.order_item_id = oi.id
                 WHERE vi.voucher_id = ?
                 ORDER BY vi.id ASC
@@ -241,7 +239,6 @@ try {
                     'unit_id'       => $item['unit_id'] ?? null,
                     'rate'          => $rate,
                     'amount'        => $amount,
-                    'godown_id'     => $item['godown_id'] ?? null,
                     'description'   => $item['description'] ?? null,
                     'order_item_id' => $item['order_item_id'] ?? null,
                 ];
@@ -282,8 +279,8 @@ try {
             $stmtItem = $pdo->prepare("
                 INSERT INTO voucher_items (
                     voucher_id, product_id, item_name, colour, gsm, dia, count, roll,
-                    quantity, unit_id, rate, amount, godown_id, description, order_item_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    quantity, unit_id, rate, amount, description, order_item_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($processedItems as $item) {
@@ -300,7 +297,6 @@ try {
                     $item['unit_id'],
                     $item['rate'],
                     $item['amount'],
-                    $item['godown_id'],
                     $item['description'],
                     $item['order_item_id'],
                 ]);
@@ -464,7 +460,6 @@ try {
                     'unit_id'       => $item['unit_id'] ?? null,
                     'rate'          => $rate,
                     'amount'        => $amount,
-                    'godown_id'     => $item['godown_id'] ?? null,
                     'description'   => $item['description'] ?? null,
                     'order_item_id' => $item['order_item_id'] ?? null,
                 ];
@@ -513,8 +508,8 @@ try {
             $stmtItem = $pdo->prepare("
                 INSERT INTO voucher_items (
                     voucher_id, product_id, item_name, colour, gsm, dia, count, roll,
-                    quantity, unit_id, rate, amount, godown_id, description, order_item_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    quantity, unit_id, rate, amount, description, order_item_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             $newVoucherNo = $input['voucher_no'] ?? $existing['voucher_no'];
@@ -533,7 +528,6 @@ try {
                     $item['unit_id'],
                     $item['rate'],
                     $item['amount'],
-                    $item['godown_id'],
                     $item['description'],
                     $item['order_item_id'],
                 ]);

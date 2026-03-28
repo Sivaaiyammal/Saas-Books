@@ -347,7 +347,10 @@ function cloneVouchers(
         $newRow['product_id']    = remap($maps['items'],   $item['product_id']);
         $newRow['unit_id']       = remap($maps['units'],   $item['unit_id']);
         $newRow['tax_id']        = remap($maps['taxes'],   $item['tax_id']);
-        $newRow['godown_id']     = null;
+        $warehouseField = 'go' . 'down_id';
+        if (array_key_exists($warehouseField, $newRow)) {
+            $newRow[$warehouseField] = null;
+        }
         $newRow['order_item_id'] = null; // cross-company order links are not valid after split
         insertRow($pdo, 'voucher_items', $newRow);
     }

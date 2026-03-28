@@ -84,13 +84,11 @@ try {
                 SELECT vi.*,
                        i.item_code, i.hsn_code,
                        un.name as unit_name, un.symbol as unit_symbol,
-                       t.name as tax_name, t.rate as tax_rate,
-                       g.name as godown_name
+                       t.name as tax_name, t.rate as tax_rate
                 FROM voucher_items vi
                 LEFT JOIN items i ON vi.product_id = i.id
                 LEFT JOIN units un ON vi.unit_id = un.id
                 LEFT JOIN taxes t ON vi.tax_id = t.id
-                LEFT JOIN godowns g ON vi.godown_id = g.id
                 WHERE vi.voucher_id = ?
                 ORDER BY vi.id ASC
             ");
@@ -336,7 +334,6 @@ try {
                     'igst' => $igst,
                     'tax_amount' => $taxAmount,
                     'amount' => $amount,
-                    'godown_id' => !empty($item['godown_id']) ? $item['godown_id'] : null,
                     'description' => $item['description'] ?? null,
                     'order_item_id' => $item['order_item_id'] ?? null
                 ];
@@ -396,8 +393,8 @@ try {
                 INSERT INTO voucher_items (
                     voucher_id, product_id, item_name, colour,
                     quantity, unit_id, rate, discount_percent, discount_amount,
-                    tax_id, tax_percent, tax_amount, amount, godown_id, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    tax_id, tax_percent, tax_amount, amount, description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($processedItems as $item) {
@@ -415,7 +412,6 @@ try {
                     $item['tax_percent'],
                     $item['tax_amount'],
                     $item['amount'],
-                    $item['godown_id'],
                     $item['description']
                 ]);
 
@@ -787,7 +783,6 @@ try {
                     'igst' => $igst,
                     'tax_amount' => $taxAmount,
                     'amount' => $amount,
-                    'godown_id' => !empty($item['godown_id']) ? $item['godown_id'] : null,
                     'description' => $item['description'] ?? null,
                     'order_item_id' => $item['order_item_id'] ?? null
                 ];
@@ -848,8 +843,8 @@ try {
                 INSERT INTO voucher_items (
                     voucher_id, product_id, item_name, colour,
                     quantity, unit_id, rate, discount_percent, discount_amount,
-                    tax_id, tax_percent, tax_amount, amount, godown_id, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    tax_id, tax_percent, tax_amount, amount, description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($processedItems as $item) {
@@ -867,7 +862,6 @@ try {
                     $item['tax_percent'],
                     $item['tax_amount'],
                     $item['amount'],
-                    $item['godown_id'],
                     $item['description']
                 ]);
 

@@ -83,13 +83,11 @@ try {
                 SELECT vi.*,
                        i.item_code,
                        un.name as unit_name, un.symbol as unit_symbol,
-                       t.name as tax_name, t.rate as tax_rate,
-                       g.name as godown_name
+                       t.name as tax_name, t.rate as tax_rate
                 FROM voucher_items vi
                 LEFT JOIN items i ON vi.product_id = i.id
                 LEFT JOIN units un ON vi.unit_id = un.id
                 LEFT JOIN taxes t ON vi.tax_id = t.id
-                LEFT JOIN godowns g ON vi.godown_id = g.id
                 WHERE vi.voucher_id = ?
                 ORDER BY vi.id ASC
             ");
@@ -275,7 +273,6 @@ try {
                     'discount_percent' => $item['discount_percent'] ?? 0,
                     'discount_amount' => $discountAmt,
                     'amount' => $amount,
-                    'godown_id' => $item['godown_id'] ?? null,
                     'description' => $item['description'] ?? null
                 ];
             }
@@ -340,8 +337,8 @@ try {
             $stmtItem = $pdo->prepare("
                 INSERT INTO voucher_items (
                     voucher_id, product_id, item_name, colour, gsm, dia, count, roll,
-                    quantity, unit_id, rate, discount_percent, discount_amount, amount, godown_id, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    quantity, unit_id, rate, discount_percent, discount_amount, amount, description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($processedItems as $item) {
@@ -360,7 +357,6 @@ try {
                     $item['discount_percent'],
                     $item['discount_amount'],
                     $item['amount'],
-                    $item['godown_id'],
                     $item['description']
                 ]);
 
@@ -546,7 +542,6 @@ try {
                     'discount_percent' => $item['discount_percent'] ?? 0,
                     'discount_amount'  => $discountAmt,
                     'amount'           => $amount,
-                    'godown_id'        => $item['godown_id'] ?? null,
                     'description'      => $item['description'] ?? null
                 ];
             }
@@ -621,8 +616,8 @@ try {
             $stmtItem = $pdo->prepare("
                 INSERT INTO voucher_items (
                     voucher_id, product_id, item_name, colour, gsm, dia, count, roll,
-                    quantity, unit_id, rate, discount_percent, discount_amount, amount, godown_id, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    quantity, unit_id, rate, discount_percent, discount_amount, amount, description
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($processedItems as $item) {
@@ -641,7 +636,6 @@ try {
                     $item['discount_percent'],
                     $item['discount_amount'],
                     $item['amount'],
-                    $item['godown_id'],
                     $item['description']
                 ]);
 
