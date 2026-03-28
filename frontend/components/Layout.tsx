@@ -211,14 +211,15 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
     },
     {
       section: 'Data', items: [
-        {
-          name: 'Data',
-          icon: <HardDrive size={18} />,
-          children: [
-            { name: 'Backup & Restore', path: '/data/backup' },
-            { name: 'Split', path: '/data/split' },
-          ]
-        },
+        // {
+        //   name: 'Data',
+        //   icon: <HardDrive size={18} />,
+        //   children: [
+        //     { name: 'Backup & Restore', path: '/data/backup' },
+        //     { name: 'Split', path: '/data/split' },
+        //   ]
+        // },
+        { name: 'Company Details', path: '/settings', icon: <Settings size={18} className="text-slate-500" /> },
       ]
     },
     {
@@ -230,7 +231,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
         ...(isModuleEnabled('quotation') ? [{ name: 'New Quotation', path: '/vouchers/quotation', icon: <Plus size={18} className="text-blue-500" /> }] : []),
         ...(isModuleEnabled('receipt') ? [{ name: 'New Receipt', path: '/vouchers/receipt', icon: <Receipt size={18} className="text-indigo-500" /> }] : []),
         ...(isModuleEnabled('payment') ? [{ name: 'New Payment', path: '/vouchers/payment', icon: <CreditCard size={18} className="text-amber-500" /> }] : []),
-        { name: 'Company Details', path: '/settings', icon: <Settings size={18} className="text-slate-500" /> },
+        // { name: 'Company Details', path: '/settings', icon: <Settings size={18} className="text-slate-500" /> },
       ]
     }
   ];
@@ -342,13 +343,13 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
         </nav>
 
         {/* Sidebar Footer */}
-        <div className={`px-4 pb-6 mt-auto transition-all duration-300 ${isExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+        {/* <div className={`px-4 pb-6 mt-auto transition-all duration-300 ${isExpanded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
           <div className="bg-slate-900 rounded-[1.5rem] p-4 text-white relative overflow-hidden group shadow-xl">
             <Zap className="absolute -right-2 -bottom-2 w-12 h-12 text-indigo-500/10 group-hover:scale-110 transition-transform" />
             <p className="text-[9px] font-black text-indigo-400 mb-0.5 tracking-widest uppercase">Encryption</p>
             <p className="text-[10px] text-slate-300 mb-3 font-bold whitespace-nowrap">Node: Secure</p>
           </div>
-        </div>
+        </div> */}
       </aside>
 
       {/* Main Content Area (Fix for Right Side Overflow) */}

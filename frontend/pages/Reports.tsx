@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart2,
@@ -9,9 +9,24 @@ import {
   Calendar,
   ArrowUpRight
 } from 'lucide-react';
+import { authApi } from '../services/api';
 
 const Reports: React.FC = () => {
   const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    authApi.getMe().then((res) => {
+      if (res.success && res.data?.user) setUser(res.data.user);
+    }).catch(() => {});
+  }, []);
+
+  const isModuleEnabled = (moduleKey: string): boolean => {
+    const modules = user?.modules;
+    if (!modules || typeof modules !== 'object') return true;
+    if (!(moduleKey in modules)) return true;
+    return Boolean(modules[moduleKey]);
+  };
 
   const reportCategories = [
     {
@@ -37,7 +52,7 @@ const Reports: React.FC = () => {
       items: [
         { name: 'Sales Register', desc: 'Detailed list of all sales invoices', id: 'sales_register' },
         { name: 'Purchase Register', desc: 'Detailed list of all purchase invoices', id: 'purchase_register' },
-        { name: 'Quotation Register', desc: 'Detailed list of all quotations', id: 'quotation_register' },
+        ...(isModuleEnabled('quotation') ? [{ name: 'Quotation Register', desc: 'Detailed list of all quotations', id: 'quotation_register' }] : []),
         // { name: 'Outstanding Payables', desc: 'Amount due to suppliers', id: 'payables' },
       ]
     }
