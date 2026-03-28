@@ -67,10 +67,6 @@ export interface VoucherRow {
   itemId: string;
   item: string;
   colour: string;
-  gsm: string;
-  dia: string;
-  count: string;
-  roll: number;
   qty: number;
   unit: string;
   rate: number;
@@ -85,10 +81,6 @@ export const createEmptyRow = (): VoucherRow => ({
   itemId: '',
   item: '',
   colour: '',
-  gsm: '',
-  dia: '',
-  count: '',
-  roll: 0,
   qty: 0,
   unit: 'Meters',
   rate: 0,

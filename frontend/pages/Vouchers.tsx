@@ -49,7 +49,7 @@ const Vouchers: React.FC = () => {
   const unitsList = ['Meters', 'Pcs', 'Kgs', 'Rolls', 'Cones'];
 
   const [rows, setRows] = useState([
-    { id: 1, itemId: '', item: '', colour: '', dia: '', count: '', qty: 0, unit: 'Meters', rate: 0, gst: 5, amount: 0 }
+    { id: 1, itemId: '', item: '', colour: '', qty: 0, unit: 'Meters', rate: 0, gst: 5, amount: 0 }
   ]);
   
   const [prefix, setPrefix] = useState(type === 'purchase' ? 'PUR' : 'INV');
@@ -66,7 +66,7 @@ const Vouchers: React.FC = () => {
   const [isEwbModalOpen, setIsEwbModalOpen] = useState(false);
   const [savedInvoiceData, setSavedInvoiceData] = useState<any>(null);
 
-  const addRow = () => setRows([...rows, { id: Date.now(), itemId: '', item: '', colour: '', dia: '', count: '', qty: 0, unit: 'Meters', rate: 0, gst: 5, amount: 0 }]);
+  const addRow = () => setRows([...rows, { id: Date.now(), itemId: '', item: '', colour: '', qty: 0, unit: 'Meters', rate: 0, gst: 5, amount: 0 }]);
   const removeRow = (id: number) => rows.length > 1 && setRows(rows.filter(r => r.id !== id));
 
   const handleItemChange = (idx: number, itemId: string) => {

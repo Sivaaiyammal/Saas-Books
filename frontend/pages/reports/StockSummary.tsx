@@ -11,7 +11,6 @@ import {
   Package,
   Layers,
   ChevronRight,
-  Hash,
   Eye,
   X,
   FileDown,
@@ -28,8 +27,6 @@ import {
   ArrowDownRight,
   SlidersHorizontal,
   Plus,
-  // Added missing Activity icon import
-  Activity,
   Share2,
 } from "lucide-react";
 import { vouchersApi, mastersApi } from "../../services/api";
@@ -43,9 +40,6 @@ interface StockSummaryItem {
   name: string;
   alias: string | null;
   colour: string | null;
-  gsm: string | null;
-  dia: string | null;
-  count: string | null;
   item_group_name: string;
   unit_name: string;
   unit_symbol: string;
@@ -597,23 +591,7 @@ const StockSummary: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-4 py-6 text-center">
-                      <div className="flex flex-wrap gap-1 justify-center">
-                        {item.gsm && (
-                          <span className="px-1.5 py-0.5 bg-slate-50 text-[8px] font-black text-slate-400 uppercase rounded border border-slate-100">
-                            {item.gsm} GSM
-                          </span>
-                        )}
-                        {item.dia && (
-                          <span className="px-1.5 py-0.5 bg-slate-50 text-[8px] font-black text-slate-400 uppercase rounded border border-slate-100">
-                            {item.dia} DIA
-                          </span>
-                        )}
-                        {item.count && (
-                          <span className="px-1.5 py-0.5 bg-slate-50 text-[8px] font-black text-slate-400 uppercase rounded border border-slate-100">
-                            {item.count} CNT
-                          </span>
-                        )}
-                      </div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase">--</span>
                     </td>
                     <td className="px-8 py-6 text-right relative">
                       <div className="w-8 h-8 rounded-lg border border-slate-100 flex items-center justify-center text-slate-300 group-hover:bg-white group-hover:text-indigo-600 group-hover:shadow-sm transition-all">
@@ -715,30 +693,9 @@ const StockSummary: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1.5">
-                        <Calculator size={10} className="text-indigo-500" />{" "}
-                        Weight Spec
+                        <Tag size={10} className="text-indigo-500" /> Variant
                       </p>
-                      <p className="text-xs font-black text-slate-900">
-                        {selectedItem.gsm || "--"} GSM
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1.5">
-                        <Activity size={10} className="text-indigo-500" /> Width
-                        / Dia
-                      </p>
-                      <p className="text-xs font-black text-slate-900">
-                        {selectedItem.dia || "--"} inch
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1.5">
-                        <Hash size={10} className="text-indigo-500" /> Yarn
-                        Count
-                      </p>
-                      <p className="text-xs font-black text-slate-900">
-                        {selectedItem.count || "--"}
-                      </p>
+                      <p className="text-xs font-black text-slate-900">--</p>
                     </div>
                   </div>
                 </div>

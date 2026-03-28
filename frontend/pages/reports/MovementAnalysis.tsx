@@ -37,7 +37,6 @@ import {
   Share,
   Share2,
 } from "lucide-react";
-import { vouchersApi, mastersApi } from "../../services/api";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 // --- Interfaces ---
@@ -47,9 +46,6 @@ interface StockItemSummary {
   name: string;
   alias: string | null;
   colour: string | null;
-  gsm: string | null;
-  dia: string | null;
-  count: string | null;
   item_group_name: string;
   unit_name: string;
   unit_symbol: string;
@@ -762,37 +758,13 @@ const MovementAnalysis: React.FC = () => {
                           </div>
                           <div>
                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                              <Calculator
-                                size={10}
-                                className="text-indigo-500"
-                              />{" "}
-                              GSM Spec
-                            </p>
-                            <p className="text-xs font-black text-slate-700">
-                              {selectedItemDetail.gsm || "--"} GSM
-                            </p>
-                          </div>
-                        </div>
-                        <div className="space-y-6">
-                          <div>
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-                              <Activity size={10} className="text-indigo-500" />{" "}
-                              Dia / Width
-                            </p>
-                            <p className="text-xs font-black text-slate-700">
-                              {selectedItemDetail.dia || "--"} inch
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
                               <Hash size={10} className="text-indigo-500" />{" "}
-                              Yarn Count
+                              Variant
                             </p>
-                            <p className="text-xs font-black text-slate-700">
-                              {selectedItemDetail.count || "--"}
-                            </p>
+                            <p className="text-xs font-black text-slate-700">--</p>
                           </div>
                         </div>
+                        <div className="space-y-6" />
                       </div>
 
                       <div className="md:col-span-3 bg-slate-900 rounded-[2.5rem] p-8 text-white flex flex-col justify-center text-center">

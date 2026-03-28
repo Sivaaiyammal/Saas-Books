@@ -789,9 +789,9 @@ const PurchaseRegister: React.FC = () => {
                             </div>
                             <div className="col-span-4 px-4 py-4">
                               <p className="font-bold text-slate-900">{item.item_name}</p>
-                              {(item.colour || item.gsm || item.dia) && (
+                              {item.colour && (
                                 <p className="text-[10px] text-slate-400 mt-0.5">
-                                  {item.colour && `${item.colour}`} {item.gsm && `| ${item.gsm} GSM`} {item.dia && `| ${item.dia} Dia`}
+                                  {item.colour}
                                 </p>
                               )}
                             </div>

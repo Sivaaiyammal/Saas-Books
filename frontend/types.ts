@@ -21,9 +21,6 @@ export interface MasterItem {
   description: string | null;
   item_code: string;
   hsn_code: string | null;
-  gsm: string | null;
-  count: string | null;
-  dia: string | null;
   colour: string | null;
   unit_id: number;
   opening_stock: string | number;

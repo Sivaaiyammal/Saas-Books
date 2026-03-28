@@ -263,10 +263,6 @@ try {
                     'product_id' => $item['item_id'] ?? $item['product_id'] ?? null,
                     'item_name' => $item['item_name'],
                     'colour' => $item['colour'] ?? null,
-                    'gsm' => $item['gsm'] ?? null,
-                    'dia' => $item['dia'] ?? null,
-                    'count' => $item['count'] ?? null,
-                    'roll' => $item['roll'] ?? null,
                     'quantity' => $qty,
                     'unit_id' => $item['unit_id'] ?? null,
                     'rate' => $rate,
@@ -336,9 +332,9 @@ try {
             // Insert items
             $stmtItem = $pdo->prepare("
                 INSERT INTO voucher_items (
-                    voucher_id, product_id, item_name, colour, gsm, dia, count, roll,
+                    voucher_id, product_id, item_name, colour,
                     quantity, unit_id, rate, discount_percent, discount_amount, amount, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($processedItems as $item) {
@@ -347,10 +343,6 @@ try {
                     $item['product_id'],
                     $item['item_name'],
                     $item['colour'],
-                    $item['gsm'],
-                    $item['dia'],
-                    $item['count'],
-                    $item['roll'],
                     $item['quantity'],
                     $item['unit_id'],
                     $item['rate'],
@@ -532,10 +524,6 @@ try {
                     'product_id'       => $item['item_id'] ?? $item['product_id'] ?? null,
                     'item_name'        => $item['item_name'],
                     'colour'           => $item['colour'] ?? null,
-                    'gsm'              => $item['gsm'] ?? null,
-                    'dia'              => $item['dia'] ?? null,
-                    'count'            => $item['count'] ?? null,
-                    'roll'             => $item['roll'] ?? null,
                     'quantity'         => $qty,
                     'unit_id'          => $item['unit_id'] ?? null,
                     'rate'             => $rate,
@@ -615,9 +603,9 @@ try {
             // 7. INSERT NEW ITEMS + REDUCE STOCK
             $stmtItem = $pdo->prepare("
                 INSERT INTO voucher_items (
-                    voucher_id, product_id, item_name, colour, gsm, dia, count, roll,
+                    voucher_id, product_id, item_name, colour,
                     quantity, unit_id, rate, discount_percent, discount_amount, amount, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($processedItems as $item) {
@@ -626,10 +614,6 @@ try {
                     $item['product_id'],
                     $item['item_name'],
                     $item['colour'],
-                    $item['gsm'],
-                    $item['dia'],
-                    $item['count'],
-                    $item['roll'],
                     $item['quantity'],
                     $item['unit_id'],
                     $item['rate'],

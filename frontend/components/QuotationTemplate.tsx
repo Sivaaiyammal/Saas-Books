@@ -10,9 +10,6 @@ interface QuotationCharge {
 interface QuotationItem {
     item_name: string;
     colour?: string;
-    count?: string;
-    dia?: string;
-    gsm?: string;
     quantity: string | number;
     unit_symbol?: string;
     rate: string | number;
@@ -308,13 +305,6 @@ const QuotationTemplate = forwardRef<HTMLDivElement, QuotationTemplateProps>(
                                                             <td className="py-2 border-r-2 border-slate-900 align-top text-xs">{globalIndex + 1}</td>
                                                             <td className="py-2 border-r-2 border-slate-900 text-left px-3 align-top">
                                                                 <div className="font-black text-xs uppercase">{item.item_name}</div>
-                                                                {(item.gsm || item.dia || item.count) && (
-                                                                    <div className="text-[10px] text-slate-500 mt-1 font-medium flex gap-2">
-                                                                        {item.gsm && <span>GSM: {item.gsm}</span>}
-                                                                        {item.dia && <span>DIA: {item.dia}</span>}
-                                                                        {item.count && <span>COUNT: {item.count}</span>}
-                                                                    </div>
-                                                                )}
                                                             </td>
                                                             <td className="py-2 border-r-2 border-slate-900 align-top uppercase text-xs">{item.colour || '--'}</td>
                                                             <td className="py-2 border-r-2 border-slate-900 align-top text-xs">

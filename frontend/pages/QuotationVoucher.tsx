@@ -39,9 +39,6 @@ interface StockItem {
   unit_name?: string;
   rate?: number;
   colour?: string;
-  gsm?: string;
-  dia?: string;
-  count?: string;
   opening_stock?: number;
 }
 
@@ -241,9 +238,6 @@ const QuotationVoucher: React.FC = () => {
             itemId: String(item.product_id || ""),
             item: item.item_name || "",
             colour: item.colour || "",
-            gsm: item.gsm || "",
-            dia: item.dia || "",
-            count: item.count || "",
             qty: parseFloat(item.quantity) || 0,
             rate: parseFloat(item.rate) || 0,
             unit: item.unit_symbol || item.unit_name || "Pcs",
@@ -277,9 +271,6 @@ const QuotationVoucher: React.FC = () => {
         itemId,
         item: selected.name,
         colour: selected.colour || "",
-        gsm: selected.gsm || "",
-        dia: selected.dia || "",
-        count: selected.count || "",
         rate: selected.rate || 0,
         unit: defaultUnit?.symbol || defaultUnit?.name || "Pcs",
         amount: newRows[idx].qty * (selected.rate || 0),
@@ -290,9 +281,6 @@ const QuotationVoucher: React.FC = () => {
         itemId: "",
         item: "",
         colour: "",
-        gsm: "",
-        dia: "",
-        count: "",
         rate: 0,
         amount: 0,
       };
@@ -337,10 +325,6 @@ const QuotationVoucher: React.FC = () => {
             product_id: parseInt(row.itemId),
             item_name: row.item,
             colour: row.colour,
-            gsm: row.gsm,
-            dia: row.dia,
-            count: row.count,
-            roll: row.roll,
             quantity: row.qty,
             unit_id:
               units.find((u) => u.symbol === row.unit || u.name === row.unit)
@@ -659,10 +643,6 @@ const QuotationVoucher: React.FC = () => {
                   <th className="px-4 py-4 w-[50px]">#</th>
                   <th className="px-4 py-4 w-[250px]">Product / Service</th>
                   <th className="px-4 py-4 w-[100px]">Colour</th>
-                  <th className="px-4 py-4 w-[80px]">GSM</th>
-                  <th className="px-4 py-4 w-[80px]">DIA</th>
-                  <th className="px-4 py-4 w-[80px]">COUNT</th>
-                  <th className="px-4 py-4 w-[80px]">Roll</th>
                   <th className="px-4 py-4 w-[100px]">Qty</th>
                   <th className="px-4 py-4 w-[100px]">Unit</th>
                   <th className="px-4 py-4 w-[120px]">Rate</th>
@@ -701,50 +681,6 @@ const QuotationVoucher: React.FC = () => {
                         value={row.colour}
                         onChange={(e) =>
                           updateRowValue(idx, "colour", e.target.value)
-                        }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold"
-                      />
-                    </td>
-                    <td className="px-1 py-4">
-                      <input
-                        type="text"
-                        value={row.gsm}
-                        onChange={(e) =>
-                          updateRowValue(idx, "gsm", e.target.value)
-                        }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold"
-                      />
-                    </td>
-                    <td className="px-1 py-4">
-                      <input
-                        type="text"
-                        value={row.dia}
-                        onChange={(e) =>
-                          updateRowValue(idx, "dia", e.target.value)
-                        }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold"
-                      />
-                    </td>
-                    <td className="px-1 py-4">
-                      <input
-                        type="text"
-                        value={row.count}
-                        onChange={(e) =>
-                          updateRowValue(idx, "count", e.target.value)
-                        }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold"
-                      />
-                    </td>
-                    <td className="px-1 py-4">
-                      <input
-                        type="number"
-                        value={row.roll}
-                        onChange={(e) =>
-                          updateRowValue(
-                            idx,
-                            "roll",
-                            parseFloat(e.target.value) || 0,
-                          )
                         }
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold"
                       />
@@ -820,8 +756,6 @@ const QuotationVoucher: React.FC = () => {
                   <th className="px-1 py-4 w-[35px] text-center">#</th>
                   <th className="px-1 py-4 w-[160px]">Stock Item</th>
                   <th className="px-1 py-4 w-[80px]">Colour</th>
-                  <th className="px-1 py-4 w-[40px]">GSM</th>
-                  <th className="px-1 py-4 w-[40px]">Dia</th>
                   <th className="px-1 py-4 w-[50px]">Qty</th>
                   <th className="px-1 py-4 w-[40px]">Unit</th>
                   <th className="px-1 py-4 w-[70px]">Rate</th>
@@ -872,28 +806,6 @@ const QuotationVoucher: React.FC = () => {
                           updateRowValue(idx, "colour", e.target.value)
                         }
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-300"
-                      />
-                    </td>
-                    <td className="px-0.5 py-4">
-                      <input
-                        type="text"
-                        value={row.gsm}
-                        placeholder="--"
-                        onChange={(e) =>
-                          updateRowValue(idx, "gsm", e.target.value)
-                        }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-[11px] font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-300"
-                      />
-                    </td>
-                    <td className="px-0.5 py-4">
-                      <input
-                        type="text"
-                        value={row.dia}
-                        placeholder="--"
-                        onChange={(e) =>
-                          updateRowValue(idx, "dia", e.target.value)
-                        }
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2 py-2 text-[11px] font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-300"
                       />
                     </td>
                     <td className="px-0.5 py-4">
@@ -1046,68 +958,7 @@ const QuotationVoucher: React.FC = () => {
                       className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-600/10 focus:border-indigo-600 outline-none"
                     />
                   </div>
-                  <div className="grid grid-cols-4 col-span-1 gap-1">
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
-                        GSM
-                      </label>
-                      <input
-                        type="text"
-                        value={row.gsm}
-                        placeholder="--"
-                        onChange={(e) =>
-                          updateRowValue(idx, "gsm", e.target.value)
-                        }
-                        className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-2 text-[10px] font-bold font-mono text-center text-slate-900 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
-                        Dia
-                      </label>
-                      <input
-                        type="text"
-                        value={row.dia}
-                        placeholder="--"
-                        onChange={(e) =>
-                          updateRowValue(idx, "dia", e.target.value)
-                        }
-                        className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-2 text-[10px] font-bold font-mono text-center text-slate-900 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
-                        Cnt
-                      </label>
-                      <input
-                        type="text"
-                        value={row.count}
-                        placeholder="--"
-                        onChange={(e) =>
-                          updateRowValue(idx, "count", e.target.value)
-                        }
-                        className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-2 text-[10px] font-bold font-mono text-center text-slate-900 outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1">
-                        Roll
-                      </label>
-                      <input
-                        type="number"
-                        value={row.roll}
-                        placeholder="0"
-                        onChange={(e) =>
-                          updateRowValue(
-                            idx,
-                            "roll",
-                            parseInt(e.target.value) || 0,
-                          )
-                        }
-                        className="w-full bg-white border border-slate-200 rounded-lg px-1.5 py-2 text-[10px] font-bold font-mono text-center text-slate-900 outline-none"
-                      />
-                    </div>
-                  </div>
+
                 </div>
 
                 <div className="grid grid-cols-12 gap-2 items-end">

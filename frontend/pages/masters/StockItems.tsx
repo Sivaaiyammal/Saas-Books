@@ -943,39 +943,6 @@ const StockItems: React.FC = () => {
                 )}
 
 
-                {/* {!formData.is_service && (
-
-                  <div className="space-y-5 animate-in slide-in-from-top-4">
-                     <h3 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
-                       <Layers size={12} /> Fabric Parameters
-                     </h3>
-                     <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">HSN Code</label>
-                          <input type="text" placeholder="52081100" value={formData.hsn_code} onChange={(e) => setFormData({...formData, hsn_code: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none transition-all" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">GSM</label>
-                          <input type="text" placeholder="e.g. 180" value={formData.gsm} onChange={(e) => setFormData({...formData, gsm: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none transition-all" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Count</label>
-                          <input type="text" placeholder="e.g. 40s" value={formData.count} onChange={(e) => setFormData({...formData, count: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none transition-all" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Dia / Width</label>
-                          <input type="text" placeholder="72 inch" value={formData.dia} onChange={(e) => setFormData({...formData, dia: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none transition-all" />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Colour</label>
-                          <div className="relative">
-                             <Palette className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
-                             <input type="text" placeholder="e.g. Red" value={formData.colour} onChange={(e) => setFormData({...formData, colour: e.target.value})} className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:ring-4 focus:ring-indigo-600/5 focus:border-indigo-600 outline-none transition-all" />
-                          </div>
-                        </div>
-                     </div>
-                  </div>
-                )} */}
 
                 <div className="space-y-5">
                   <h3 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 flex items-center gap-2">
