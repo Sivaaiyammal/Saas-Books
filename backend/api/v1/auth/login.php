@@ -51,13 +51,13 @@ try {
             u.email,
             u.password,
             u.phone,
-            u.company_id,
-            u.role_id,
-            COALESCE(r.name, u.role, 'user') AS role,
+            cu.company_id,
+            NULL AS role_id,
+            u.role,
             u.status,
             u.created_at
         FROM users u
-        LEFT JOIN roles r ON r.id = u.role_id
+        LEFT JOIN company_users cu ON cu.user_id = u.id AND cu.is_default = 1
         WHERE u.email = ?
         LIMIT 1
     ");

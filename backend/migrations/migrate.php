@@ -60,13 +60,11 @@ function getLastBatch(PDO $pdo): int {
 
 function loadMigration(string $file): object {
     require_once $file;
-    $class = pathinfo($file, PATHINFO_FILENAME); // class name = filename
-    // convert filename to class name: 001_create_users → Migration_001_CreateUsers
-    $parts = explode('_', $class);
-    $parts = array_map('ucfirst', $parts);
-    $class = 'Migration_' . implode('', $parts);
-    // strip leading zeros from numeric prefix in class name
-    $class = preg_replace('/^Migration_0*(\d+)/', 'Migration_$1', $class);
+    $basename = pathinfo($file, PATHINFO_FILENAME); // e.g. "001_create_users"
+    $parts    = explode('_', $basename);
+    $num      = (int)$parts[0];                                          // "001" → 1
+    $name     = implode('', array_map('ucfirst', array_slice($parts, 1))); // "CreateUsers"
+    $class    = "Migration_{$num}_{$name}";                              // "Migration_1_CreateUsers"
     return new $class(getDbConnection());
 }
 
