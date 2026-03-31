@@ -23,8 +23,8 @@ try {
 
     if ($method === 'GET') {
         if (isset($_GET['id'])) {
-            $stmt = $pdo->prepare("SELECT * FROM units WHERE id = ? AND status = 'active'");
-            $stmt->execute([(int)$_GET['id']]);
+            $stmt = $pdo->prepare("SELECT * FROM units WHERE id = ? AND (company_id = ? OR company_id IS NULL) AND status = 'active'");
+            $stmt->execute([(int)$_GET['id'], $companyId]);
             $unit = $stmt->fetch();
             if (!$unit) ApiResponse::error('Unit not found', 404);
             ApiResponse::success($unit, 'Unit retrieved successfully');
@@ -36,9 +36,8 @@ try {
         $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
         $offset = ($page - 1) * $limit;
 
-        $where = ["status = 'active'"];
-        $params = [];
-        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'company_id');
+        $where = ["status = 'active'", "(company_id = ? OR company_id IS NULL)"];
+        $params = [$companyId];
 
         if ($search) {
             $where[] = "(name LIKE ? OR symbol LIKE ? OR description LIKE ?)";
@@ -83,9 +82,10 @@ try {
         $decimal_places = isset($input['decimal_places']) ? (int)$input['decimal_places'] : 2;
         $description = $input['description'] ?? null;
 
-        $stmt = $pdo->prepare("SELECT id FROM units WHERE name = ? AND company_id = ? AND status = 'active'");
+        // Check if name exists globally or for this company
+        $stmt = $pdo->prepare("SELECT id FROM units WHERE name = ? AND (company_id = ? OR company_id IS NULL) AND status = 'active'");
         $stmt->execute([$name, $companyId]);
-        if ($stmt->fetch()) ApiResponse::validationError(['name' => ['Unit with this name already exists']]);
+        if ($stmt->fetch()) ApiResponse::validationError(['name' => ['Unit with this name already exists (either as a system unit or in your company)']]);
 
         $stmt = $pdo->prepare("INSERT INTO units (name, symbol, unit_type, decimal_places, description, company_id) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$name, $symbol, $unit_type, $decimal_places, $description, $companyId]);
@@ -108,6 +108,11 @@ try {
         $stmt->execute([$id]);
         $existingUnit = $stmt->fetch();
         if (!$existingUnit) ApiResponse::error('Unit not found', 404);
+
+        // Prevent modification of system units
+        if ($existingUnit['company_id'] === null) {
+            ApiResponse::error('System units cannot be modified', 403);
+        }
 
         $name = isset($input['name']) ? trim($input['name']) : $existingUnit['name'];
         $symbol = isset($input['symbol']) ? trim($input['symbol']) : $existingUnit['symbol'];
@@ -136,7 +141,13 @@ try {
         $id = (int)($input['id'] ?? $_GET['id']);
         $stmt = $pdo->prepare("SELECT * FROM units WHERE id = ? AND status = 'active'");
         $stmt->execute([$id]);
-        if (!$stmt->fetch()) ApiResponse::error('Unit not found', 404);
+        $unit = $stmt->fetch();
+        if (!$unit) ApiResponse::error('Unit not found', 404);
+
+        // Prevent deletion of system units
+        if ($unit['company_id'] === null) {
+            ApiResponse::error('System units cannot be deleted', 403);
+        }
 
         $stmt = $pdo->prepare("UPDATE units SET status = 'inactive' WHERE id = ?");
         $stmt->execute([$id]);

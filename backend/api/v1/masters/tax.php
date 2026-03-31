@@ -30,7 +30,7 @@ try {
 
             $stmt = $pdo->prepare("
                 SELECT * FROM taxes
-                WHERE id = ? AND company_id = ? AND status = 'active'
+                WHERE id = ? AND (company_id = ? OR company_id IS NULL) AND status = 'active'
             ");
 
             $stmt->execute([$id, $companyId]);
@@ -54,9 +54,8 @@ try {
         $offset = ($page - 1) * $limit;
 
         // Build query
-        $where = ["status = 'active'"];
-        $params = [];
-        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'company_id');
+        $where = ["status = 'active'", "(company_id = ? OR company_id IS NULL)"];
+        $params = [$companyId];
 
         if ($search) {
             $where[] = "(name LIKE ? OR description LIKE ?)";
@@ -153,12 +152,12 @@ try {
             ]);
         }
 
-        // Check for duplicate name
-        $stmt = $pdo->prepare("SELECT id FROM taxes WHERE name = ? AND company_id = ? AND status = 'active'");
+        // Check for duplicate name globally or for this company
+        $stmt = $pdo->prepare("SELECT id FROM taxes WHERE name = ? AND (company_id = ? OR company_id IS NULL) AND status = 'active'");
         $stmt->execute([$name, $companyId]);
         if ($stmt->fetch()) {
             ApiResponse::validationError([
-                'name' => ['Tax with this name already exists']
+                'name' => ['Tax with this name already exists (either as a system tax or in your company)']
             ]);
         }
 
@@ -202,12 +201,17 @@ try {
         $id = (int)$input['id'];
 
         // Check if tax exists
-        $stmt = $pdo->prepare("SELECT * FROM taxes WHERE id = ? AND company_id = ? AND status = 'active'");
+        $stmt = $pdo->prepare("SELECT * FROM taxes WHERE id = ? AND (company_id = ? OR company_id IS NULL) AND status = 'active'");
         $stmt->execute([$id, $companyId]);
         $existingTax = $stmt->fetch();
 
         if (!$existingTax) {
             ApiResponse::error('Tax not found', 404);
+        }
+
+        // Prevent modification of system taxes
+        if ($existingTax['company_id'] === null) {
+            ApiResponse::error('System taxes cannot be modified', 403);
         }
 
         $rules = [
@@ -263,10 +267,10 @@ try {
         $stmt = $pdo->prepare("
             UPDATE taxes
             SET name = ?, tax_type = ?, rate = ?, is_default = ?, description = ?
-            WHERE id = ?
+            WHERE id = ? AND company_id = ?
         ");
 
-        $stmt->execute([$name, $tax_type, $rate, $is_default, $description, $id]);
+        $stmt->execute([$name, $tax_type, $rate, $is_default, $description, $id, $companyId]);
 
         // Get updated tax
         $stmt = $pdo->prepare("SELECT * FROM taxes WHERE id = ?");
@@ -289,17 +293,22 @@ try {
         $id = (int)($input['id'] ?? $_GET['id']);
 
         // Check if tax exists
-        $stmt = $pdo->prepare("SELECT * FROM taxes WHERE id = ? AND status = 'active'");
-        $stmt->execute([$id]);
+        $stmt = $pdo->prepare("SELECT * FROM taxes WHERE id = ? AND (company_id = ? OR company_id IS NULL) AND status = 'active'");
+        $stmt->execute([$id, $companyId]);
         $tax = $stmt->fetch();
 
         if (!$tax) {
             ApiResponse::error('Tax not found', 404);
         }
 
+        // Prevent deletion of system taxes
+        if ($tax['company_id'] === null) {
+            ApiResponse::error('System taxes cannot be deleted', 403);
+        }
+
         // Soft delete
-        $stmt = $pdo->prepare("UPDATE taxes SET status = 'inactive' WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $pdo->prepare("UPDATE taxes SET status = 'inactive' WHERE id = ? AND company_id = ?");
+        $stmt->execute([$id, $companyId]);
 
         ApiResponse::success(null, 'Tax deleted successfully');
     }
