@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ShieldCheck, Building2, Save, Loader2, RefreshCw, Plus, X, Users, LogIn } from 'lucide-react';
-import { authApi, adminApi, CompanyModules, CreateCompanyRequest, SaasCompany, SaasPlan, setTokens } from '../services/api';
+import { authApi, adminApi, CompanyModules, CreateCompanyRequest, SaasCompany, SaasPlan, setTokens, setAdminTokens } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
 const moduleLabels: Record<keyof CompanyModules, string> = {
@@ -190,6 +190,13 @@ const SaasAdminPanel: React.FC = () => {
     setError('');
 
     try {
+      // Save current admin tokens before impersonating
+      const currentAdminToken = localStorage.getItem('auth_token');
+      const currentAdminRefreshToken = localStorage.getItem('refresh_token');
+      if (currentAdminToken && currentAdminRefreshToken) {
+        setAdminTokens(currentAdminToken, currentAdminRefreshToken);
+      }
+
       const response = await adminApi.impersonateCompany(companyId);
       const accessToken = response.data?.tokens?.accessToken;
       const refreshToken = response.data?.tokens?.refreshToken;

@@ -26,7 +26,7 @@ import {
   Wallet,
   HardDrive
 } from 'lucide-react';
-import { authApi, FinancialYearOption, getSelectedFinancialYearId, getSelectedFinancialYearLabel, setSelectedFinancialYearId, setSelectedFinancialYearLabel, settingsApi } from '../services/api';
+import { authApi, FinancialYearOption, getSelectedFinancialYearId, getSelectedFinancialYearLabel, setSelectedFinancialYearId, setSelectedFinancialYearLabel, settingsApi, restoreAdminTokens } from '../services/api';
 
 interface LayoutProps {
   onLogout: () => void;
@@ -47,6 +47,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isFyOpen, setIsFyOpen] = useState(false);
+  const [hasAdminTokens, setHasAdminTokens] = useState(() => !!localStorage.getItem('admin_auth_token'));
   const [financialYears, setFinancialYears] = useState<FinancialYearOption[]>([]);
   const [selectedFinancialYearIdState, setSelectedFinancialYearIdState] = useState<number | null>(getSelectedFinancialYearId());
   const [selectedFinancialYear, setSelectedFinancialYear] = useState(getSelectedFinancialYearLabel());
@@ -60,6 +61,13 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
   const profileRef = useRef<HTMLDivElement>(null);
   const notifyRef = useRef<HTMLDivElement>(null);
   const fyRef = useRef<HTMLDivElement>(null);
+
+  const loadUserProfile = async () => {
+    const userRes = await authApi.getMe();
+    if (userRes.success && userRes.data?.user) {
+      setUser(userRes.data.user);
+    }
+  };
 
   // Responsive Sync
   useEffect(() => {
@@ -107,10 +115,17 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
       }
     };
 
-    const handleUserProfileUpdated = (event: Event) => {
+    const handleUserProfileUpdated = async (event: Event) => {
       const customEvent = event as CustomEvent<{ user?: any }>;
       if (customEvent.detail?.user) {
         setUser((prev: any) => ({ ...prev, ...customEvent.detail.user }));
+        return;
+      }
+
+      try {
+        await loadUserProfile();
+      } catch (err) {
+        console.error('Failed to refresh header profile:', err);
       }
     };
 
@@ -417,6 +432,22 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
               )}
             </div>
 
+            {/* Back to Admin Button */}
+            {hasAdminTokens && (
+              <button
+                onClick={() => {
+                  if (restoreAdminTokens()) {
+                    setHasAdminTokens(false);
+                    navigate('/saas-admin');
+                    window.location.reload();
+                  }
+                }}
+                className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 font-bold text-xs uppercase tracking-widest transition-all"
+              >
+                <LogOut size={14} /> Back to Admin
+              </button>
+            )}
+
             {/* Notifications */}
             <div className="relative" ref={notifyRef}>
               <button
@@ -453,6 +484,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
                     <Loader2 size={16} className="animate-spin" />
                   ) : user?.profile_image_url ? (
                     <img
+                      key={user.profile_image_url}
                       src={user.profile_image_url}
                       alt={user?.name || 'User'}
                       className="w-full h-full object-cover"

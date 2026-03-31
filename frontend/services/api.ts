@@ -146,6 +146,36 @@ export const setTokens = (accessToken: string, refreshToken: string) => {
   setRefreshToken(refreshToken);
 };
 
+// Admin impersonation mode: save admin tokens before switching to user tokens
+export const setAdminTokens = (accessToken: string, refreshToken: string) => {
+  localStorage.setItem('admin_auth_token', accessToken);
+  localStorage.setItem('admin_refresh_token', refreshToken);
+};
+
+export const getAdminToken = () => {
+  return localStorage.getItem('admin_auth_token');
+};
+
+export const getAdminRefreshToken = () => {
+  return localStorage.getItem('admin_refresh_token');
+};
+
+export const clearAdminTokens = () => {
+  localStorage.removeItem('admin_auth_token');
+  localStorage.removeItem('admin_refresh_token');
+};
+
+export const restoreAdminTokens = () => {
+  const adminToken = getAdminToken();
+  const adminRefreshToken = getAdminRefreshToken();
+  if (adminToken && adminRefreshToken) {
+    setTokens(adminToken, adminRefreshToken);
+    clearAdminTokens();
+    return true;
+  }
+  return false;
+};
+
 // Clear all tokens (logout)
 export const clearTokens = () => {
   removeAuthToken();
