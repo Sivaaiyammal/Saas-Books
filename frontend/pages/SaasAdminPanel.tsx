@@ -50,6 +50,7 @@ const SaasAdminPanel: React.FC = () => {
     admin_password: '',
     plan_id: undefined,
     modules: { ...defaultCreateModules },
+    assign_existing_user: false,
   });
 
   const sortedCompanies = useMemo(() => {
@@ -173,6 +174,7 @@ const SaasAdminPanel: React.FC = () => {
         admin_password: '',
         plan_id: undefined,
         modules: { ...defaultCreateModules },
+        assign_existing_user: false,
       });
 
       setIsCreateModalOpen(false);
@@ -437,9 +439,30 @@ const SaasAdminPanel: React.FC = () => {
                   <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Owner Phone</label>
                   <input value={createForm.admin_phone || ''} onChange={(e) => handleCreateInput('admin_phone', e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold" placeholder="9876543210" />
                 </div>
+                <div className="flex items-center gap-3 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
+                  <input
+                    type="checkbox"
+                    id="assign_existing_user"
+                    checked={!!createForm.assign_existing_user}
+                    onChange={(e) => setCreateForm(prev => ({ ...prev, assign_existing_user: e.target.checked }))}
+                    className="h-4 w-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                  />
+                  <label htmlFor="assign_existing_user" className="text-sm font-bold text-indigo-900 cursor-pointer">
+                    Assign to existing user account
+                  </label>
+                </div>
                 <div>
-                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Owner Password</label>
-                  <input value={createForm.admin_password} onChange={(e) => handleCreateInput('admin_password', e.target.value)} required type="password" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold" placeholder="StrongPass123" />
+                  <label className="block text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">
+                    Owner Password {createForm.assign_existing_user ? '(Leave blank if existing)' : ''}
+                  </label>
+                  <input 
+                    value={createForm.admin_password} 
+                    onChange={(e) => handleCreateInput('admin_password', e.target.value)} 
+                    required={!createForm.assign_existing_user} 
+                    type="password" 
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold" 
+                    placeholder="StrongPass123" 
+                  />
                 </div>
               </div>
 

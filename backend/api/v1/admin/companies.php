@@ -213,6 +213,7 @@ try {
         $adminPhone = trim((string)($input['admin_phone'] ?? ''));
         $adminPassword = (string)($input['admin_password'] ?? '');
         $planId = isset($input['plan_id']) ? (int)$input['plan_id'] : null;
+        $assignExistingUser = isset($input['assign_existing_user']) && $input['assign_existing_user'] === true;
         $modules = isset($input['modules']) && is_array($input['modules'])
             ? ModuleAccessHelper::normalizeModules($input['modules'])
             : ModuleAccessHelper::defaultModules();
@@ -227,17 +228,19 @@ try {
         if ($adminEmail === '' || !filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
             $validationErrors['admin_email'] = ['Valid admin email is required'];
         }
-        if (!AuthHelper::isStrongPassword($adminPassword)) {
+        if (!$assignExistingUser && !AuthHelper::isStrongPassword($adminPassword)) {
             $validationErrors['admin_password'] = ['Password must be at least 8 characters and include uppercase, lowercase, and numbers'];
         }
         if (!empty($validationErrors)) {
             ApiResponse::validationError($validationErrors);
         }
 
-        $existingUserStmt = $db->prepare('SELECT id FROM users WHERE email = ? LIMIT 1');
+        $existingUserStmt = $db->prepare('SELECT id, role FROM users WHERE email = ? LIMIT 1');
         $existingUserStmt->execute([$adminEmail]);
-        if ($existingUserStmt->fetch()) {
-            ApiResponse::validationError(['admin_email' => ['Email already exists in users']]);
+        $existingUser = $existingUserStmt->fetch();
+
+        if ($existingUser && !$assignExistingUser) {
+            ApiResponse::validationError(['admin_email' => ['Email already exists. Check "Assign to existing user" to continue.']]);
         }
 
         if ($planId !== null && $planId > 0) {
@@ -269,13 +272,54 @@ try {
         AuthHelper::assignDefaultRolePermissions($db, $roleIds, $permissionIds);
         $ownerRoleId = $roleIds['owner'] ?? null;
 
-        $passwordHash = AuthHelper::hashPassword($adminPassword);
-        $adminInsert = $db->prepare(
-            "INSERT INTO users (name, email, password, phone, company_id, role_id, role, status, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, 'admin', 'active', NOW(), NOW())"
-        );
-        $adminInsert->execute([$adminName, $adminEmail, $passwordHash, $adminPhone !== '' ? $adminPhone : null, $companyId, $ownerRoleId]);
-        $adminUserId = (int)$db->lastInsertId();
+        if ($existingUser) {
+            $adminUserId = (int)$existingUser['id'];
+            // Update existing user: link to company and set role_id if columns exist
+            $updateUserSql = "UPDATE users SET name = ?, phone = ?, updated_at = NOW()";
+            $updateParams = [$adminName, $adminPhone !== '' ? $adminPhone : null];
+            
+            if (tableHasColumn($db, 'users', 'company_id')) {
+                $updateUserSql .= ", company_id = ?,";
+                $updateParams[] = $companyId;
+            }
+            if (tableHasColumn($db, 'users', 'role_id')) {
+                $updateUserSql .= ", role_id = ?,";
+                $updateParams[] = $ownerRoleId;
+            }
+            // fix suffix comma
+            $updateUserSql = rtrim($updateUserSql, ',');
+            
+            $updateUserSql .= " WHERE id = ?";
+            $updateParams[] = $adminUserId;
+            
+            $userUpdate = $db->prepare($updateUserSql);
+            $userUpdate->execute($updateParams);
+        } else {
+            $passwordHash = AuthHelper::hashPassword($adminPassword);
+            $adminInsert = $db->prepare(
+                "INSERT INTO users (name, email, password, phone, role, status, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, 'admin', 'active', NOW(), NOW())"
+            );
+            $adminInsert->execute([$adminName, $adminEmail, $passwordHash, $adminPhone !== '' ? $adminPhone : null]);
+            $adminUserId = (int)$db->lastInsertId();
+            
+            // If the columns exist, update them (handled separately to avoid migration issues during development)
+            if (tableHasColumn($db, 'users', 'company_id') || tableHasColumn($db, 'users', 'role_id')) {
+                $updateCols = [];
+                $params = [];
+                if (tableHasColumn($db, 'users', 'company_id')) {
+                    $updateCols[] = "company_id = ?";
+                    $params[] = $companyId;
+                }
+                if (tableHasColumn($db, 'users', 'role_id')) {
+                    $updateCols[] = "role_id = ?";
+                    $params[] = $ownerRoleId;
+                }
+                $updateUserSql = "UPDATE users SET " . implode(', ', $updateCols) . " WHERE id = ?";
+                $params[] = $adminUserId;
+                $db->prepare($updateUserSql)->execute($params);
+            }
+        }
 
         $companyUserInsert = $db->prepare(
             "INSERT INTO company_users (company_id, user_id, role_id, role, is_default, status, created_at, updated_at)

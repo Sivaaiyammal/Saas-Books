@@ -527,7 +527,7 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
 
         {/* Scrollable Viewport */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-slate-50/50 p-4 md:p-8 lg:p-10 custom-scrollbar relative w-full">
-          <Outlet />
+          <Outlet context={{ user, loadingUser }} />
         </main>
       </div>
     </div>

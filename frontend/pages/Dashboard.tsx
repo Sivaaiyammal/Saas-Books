@@ -12,19 +12,30 @@ import {
   ExternalLink,
   ChevronRight,
   FileText,
-  Package
+  Package,
+  ShieldCheck,
+  Plus,
+  Building2
 } from 'lucide-react';
 import { ChartData, Transaction, VoucherType } from '../types';
 import { vouchersApi } from '../services/api';
+import { useOutletContext, Link } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
+  const { user, loadingUser } = useOutletContext<{ user: any, loadingUser: boolean }>();
   const [isLoading, setIsLoading] = React.useState(true);
   const [dashboardData, setDashboardData] = React.useState<any>(null);
+  
+  const hasCompany = !!user?.company_id;
 
   React.useEffect(() => {
+    if (!hasCompany) {
+      setIsLoading(false);
+      return;
+    }
+    
     const fetchDashboardData = async () => {
       try {
-        // Fetch directly since we imported it
         const response = await vouchersApi.getDashboardStats();
         if (response.success && response.data) {
           setDashboardData(response.data);
@@ -36,12 +47,63 @@ const Dashboard: React.FC = () => {
       }
     };
     fetchDashboardData();
-  }, []);
+  }, [hasCompany]);
 
-  if (isLoading) {
+  if (loadingUser || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (!hasCompany) {
+    return (
+      <div className="max-w-4xl mx-auto py-12 px-6 text-center">
+        <div className="w-20 h-20 bg-indigo-600 text-white rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-xl shadow-indigo-100">
+          <ShieldCheck size={40} />
+        </div>
+        <h1 className="text-4xl font-black text-slate-900 tracking-tight mb-4">
+          Welcome to Saas-Books, {user?.name || 'Super Admin'}!
+        </h1>
+        <p className="text-lg text-slate-500 font-medium mb-10 max-w-2xl mx-auto">
+          You are currently logged in as a Super Admin, but you haven't set up your company profile yet. 
+          To start using Masters, Vouchers, and Reports, you first need to create or link a company to your account.
+        </p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
+          <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-md transition-all">
+            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mb-6">
+              <Plus size={24} />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 mb-3">Create Your Company</h3>
+            <p className="text-sm text-slate-500 font-medium mb-6">
+              Set up a brand new company profile and automatically link it to your Super Admin account.
+            </p>
+            <Link 
+              to="/saas-admin" 
+              className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-100 transition-all active:scale-95"
+            >
+              Get Started <ChevronRight size={18} />
+            </Link>
+          </div>
+          
+          <div className="bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-md transition-all">
+            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mb-6">
+              <Building2 size={24} />
+            </div>
+            <h3 className="text-xl font-black text-slate-900 mb-3">SaaS Admin Panel</h3>
+            <p className="text-sm text-slate-500 font-medium mb-6">
+              Manage all companies, subscriptions, and platform-wide settings from the admin control center.
+            </p>
+            <Link 
+              to="/saas-admin" 
+              className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-100 transition-all active:scale-95"
+            >
+              Open Admin Panel <ChevronRight size={18} />
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -223,63 +285,6 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Modern Table Section */}
-      {/* <div className="bg-white rounded-2xl border border-slate-200 shadow-sm shadow-slate-200/40 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
-          <div>
-            <h3 className="font-bold text-slate-900">Recent Transactions</h3>
-            <p className="text-xs text-slate-400 font-medium mt-1">Last 10 financial entries</p>
-          </div>
-          <button className="text-indigo-600 text-xs font-black uppercase tracking-[0.1em] hover:text-indigo-700 bg-indigo-50 px-4 py-2 rounded-xl transition-all">View All</button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-widest">
-                <th className="px-6 py-4">Voucher</th>
-                <th className="px-6 py-4">Party Name</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Amount</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {recentTransactions.map((tx) => (
-                <tr key={tx.id} className="hover:bg-slate-50/50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-[10px] ${tx.type === VoucherType.SALES ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
-                        tx.type === VoucherType.PURCHASE ? 'bg-rose-50 text-rose-600 border border-rose-100' :
-                          'bg-blue-50 text-blue-600 border border-blue-100'
-                        }`}>
-                        {tx.type[0]}
-                      </div>
-                      <span className="text-sm font-bold text-slate-900 capitalize">{tx.type}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-medium text-slate-600">{tx.party}</span>
-                  </td>
-                  <td className="px-6 py-4 text-xs font-bold text-slate-400">{tx.date}</td>
-                  <td className="px-6 py-4 text-sm font-black text-slate-900">₹{tx.amount.toLocaleString()}</td>
-                  <td className="px-6 py-4">
-                    <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-wider">
-                      {tx.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all opacity-0 group-hover:opacity-100">
-                      <ExternalLink size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div> */}
     </div>
   );
 };

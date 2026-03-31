@@ -410,9 +410,10 @@ export interface CreateCompanyRequest {
   admin_name: string;
   admin_email: string;
   admin_phone?: string;
-  admin_password: string;
+  admin_password?: string;
   plan_id?: number;
   modules?: Partial<CompanyModules>;
+  assign_existing_user?: boolean;
 }
 
 interface ReceiptRequest {
