@@ -338,7 +338,13 @@ const StockItems: React.FC = () => {
         setFormError(response.message || 'Failed to save item');
       }
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || String(err) || 'Unknown error';
+      let msg = err?.response?.data?.message || err?.message || String(err) || 'Unknown error';
+      if (err?.response?.data?.errors) {
+        const errors = err.response.data.errors;
+        msg = Object.keys(errors)
+          .map((key) => `${key}: ${(errors as any)[key].join(', ')}`)
+          .join(' | ');
+      }
       setFormError(msg);
     } finally {
       setIsSaving(false);

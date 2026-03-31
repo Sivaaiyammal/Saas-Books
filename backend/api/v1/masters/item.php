@@ -670,8 +670,8 @@ try {
 
 } catch (PDOException $e) {
     error_log("Items API error: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('Failed to process request. Please try again.');
+    ApiResponse::serverError('Database Error: ' . $e->getMessage());
 } catch (Exception $e) {
     error_log("Items API exception: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('An unexpected error occurred');
+    ApiResponse::serverError('System Error: ' . $e->getMessage());
 }
