@@ -35,10 +35,10 @@ try {
                     parent.name as parent_name
                 FROM item_groups ig
                 LEFT JOIN item_groups parent ON ig.parent_id = parent.id
-                WHERE ig.id = ? AND ig.status = 'active'
+                WHERE ig.id = ? AND ig.company_id = ? AND ig.status = 'active'
             ");
 
-            $stmt->execute([$id]);
+            $stmt->execute([$id, $companyId]);
             $itemGroup = $stmt->fetch();
 
             if (!$itemGroup) {
@@ -272,10 +272,10 @@ try {
         $stmt = $pdo->prepare("
             UPDATE item_groups
             SET name = ?, parent_id = ?, group_type = ?, description = ?, updated_at = NOW()
-            WHERE id = ?
+            WHERE id = ? AND company_id = ?
         ");
 
-        $stmt->execute([$name, $parent_id, $group_type, $description, $id]);
+        $stmt->execute([$name, $parent_id, $group_type, $description, $id, $companyId]);
 
         // Get updated item group
         $stmt = $pdo->prepare("
@@ -330,8 +330,8 @@ try {
         }
 
         // Soft delete
-        $stmt = $pdo->prepare("UPDATE item_groups SET status = 'inactive' WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $pdo->prepare("UPDATE item_groups SET status = 'inactive' WHERE id = ? AND company_id = ?");
+        $stmt->execute([$id, $companyId]);
 
         ApiResponse::success(null, 'Item group deleted successfully');
     }
@@ -340,8 +340,8 @@ try {
 
 } catch (PDOException $e) {
     error_log("Item Groups API error: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('Failed to process request. Please try again.');
-} catch (Exception $e) {
+    ApiResponse::serverError('Database Error: ' . $e->getMessage());
+} catch (Throwable $e) {
     error_log("Item Groups API exception: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('An unexpected error occurred');
+    ApiResponse::serverError('System Error: ' . $e->getMessage());
 }

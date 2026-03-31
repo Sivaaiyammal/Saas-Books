@@ -43,10 +43,10 @@ try {
                 LEFT JOIN item_groups ig ON i.item_group_id = ig.id
                 LEFT JOIN units u ON i.unit_id = u.id
                 LEFT JOIN taxes t ON i.tax_id = t.id
-                WHERE i.id = ? AND i.status != 'inactive'
+                WHERE i.id = ? AND i.company_id = ? AND i.status != 'inactive'
             ");
 
-            $stmt->execute([$id]);
+            $stmt->execute([$id, $companyId]);
             $item = $stmt->fetch();
 
             if (!$item) {
@@ -370,8 +370,8 @@ try {
         $id = (int)$input['id'];
 
         // Check if item exists
-        $stmt = $pdo->prepare("SELECT * FROM items WHERE id = ? AND status != 'inactive'");
-        $stmt->execute([$id]);
+        $stmt = $pdo->prepare("SELECT * FROM items WHERE id = ? AND company_id = ? AND status != 'inactive'");
+        $stmt->execute([$id, $companyId]);
         $existingItem = $stmt->fetch();
 
         if (!$existingItem) {
@@ -651,8 +651,8 @@ try {
         $id = (int)($input['id'] ?? $_GET['id']);
 
         // Check if item exists
-        $stmt = $pdo->prepare("SELECT * FROM items WHERE id = ? AND status != 'inactive'");
-        $stmt->execute([$id]);
+        $stmt = $pdo->prepare("SELECT * FROM items WHERE id = ? AND company_id = ? AND status != 'inactive'");
+        $stmt->execute([$id, $companyId]);
         $item = $stmt->fetch();
 
         if (!$item) {
@@ -660,8 +660,8 @@ try {
         }
 
         // Soft delete
-        $stmt = $pdo->prepare("UPDATE items SET status = 'inactive' WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $pdo->prepare("UPDATE items SET status = 'inactive' WHERE id = ? AND company_id = ?");
+        $stmt->execute([$id, $companyId]);
 
         ApiResponse::success(null, 'Item deleted successfully');
     }

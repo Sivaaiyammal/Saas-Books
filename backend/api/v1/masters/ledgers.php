@@ -733,8 +733,8 @@ try {
 
 } catch (PDOException $e) {
     error_log("Ledgers API error: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('Failed to process request. Please try again.');
-} catch (Exception $e) {
+    ApiResponse::serverError('Database Error: ' . $e->getMessage());
+} catch (Throwable $e) {
     error_log("Ledgers API exception: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('An unexpected error occurred');
+    ApiResponse::serverError('System Error: ' . $e->getMessage());
 }

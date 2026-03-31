@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
-require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 // Authenticate user
@@ -19,6 +19,7 @@ $user = AuthMiddleware::authenticate();
 
 try {
     $pdo = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
     // GET: List all taxes or get single tax
@@ -29,10 +30,10 @@ try {
 
             $stmt = $pdo->prepare("
                 SELECT * FROM taxes
-                WHERE id = ? AND status = 'active'
+                WHERE id = ? AND company_id = ? AND status = 'active'
             ");
 
-            $stmt->execute([$id]);
+            $stmt->execute([$id, $companyId]);
             $tax = $stmt->fetch();
 
             if (!$tax) {
@@ -55,6 +56,7 @@ try {
         // Build query
         $where = ["status = 'active'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'company_id');
 
         if ($search) {
             $where[] = "(name LIKE ? OR description LIKE ?)";
@@ -152,8 +154,8 @@ try {
         }
 
         // Check for duplicate name
-        $stmt = $pdo->prepare("SELECT id FROM taxes WHERE name = ? AND status = 'active'");
-        $stmt->execute([$name]);
+        $stmt = $pdo->prepare("SELECT id FROM taxes WHERE name = ? AND company_id = ? AND status = 'active'");
+        $stmt->execute([$name, $companyId]);
         if ($stmt->fetch()) {
             ApiResponse::validationError([
                 'name' => ['Tax with this name already exists']
@@ -162,17 +164,17 @@ try {
 
         // If is_default is set, unset other defaults for same tax_type
         if ($is_default) {
-            $stmt = $pdo->prepare("UPDATE taxes SET is_default = 0 WHERE tax_type = ?");
-            $stmt->execute([$tax_type]);
+            $stmt = $pdo->prepare("UPDATE taxes SET is_default = 0 WHERE tax_type = ? AND company_id = ?");
+            $stmt->execute([$tax_type, $companyId]);
         }
 
         // Insert tax
         $stmt = $pdo->prepare("
-            INSERT INTO taxes (name, tax_type, rate, is_default, description)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO taxes (name, tax_type, rate, is_default, description, company_id)
+            VALUES (?, ?, ?, ?, ?, ?)
         ");
 
-        $stmt->execute([$name, $tax_type, $rate, $is_default, $description]);
+        $stmt->execute([$name, $tax_type, $rate, $is_default, $description, $companyId]);
         $taxId = $pdo->lastInsertId();
 
         // Get created tax
@@ -200,8 +202,8 @@ try {
         $id = (int)$input['id'];
 
         // Check if tax exists
-        $stmt = $pdo->prepare("SELECT * FROM taxes WHERE id = ? AND status = 'active'");
-        $stmt->execute([$id]);
+        $stmt = $pdo->prepare("SELECT * FROM taxes WHERE id = ? AND company_id = ? AND status = 'active'");
+        $stmt->execute([$id, $companyId]);
         $existingTax = $stmt->fetch();
 
         if (!$existingTax) {
@@ -243,8 +245,8 @@ try {
         }
 
         // Check for duplicate name (excluding current tax)
-        $stmt = $pdo->prepare("SELECT id FROM taxes WHERE name = ? AND id != ? AND status = 'active'");
-        $stmt->execute([$name, $id]);
+        $stmt = $pdo->prepare("SELECT id FROM taxes WHERE name = ? AND company_id = ? AND id != ? AND status = 'active'");
+        $stmt->execute([$name, $companyId, $id]);
         if ($stmt->fetch()) {
             ApiResponse::validationError([
                 'name' => ['Tax with this name already exists']
@@ -253,8 +255,8 @@ try {
 
         // If is_default is set, unset other defaults for same tax_type
         if ($is_default) {
-            $stmt = $pdo->prepare("UPDATE taxes SET is_default = 0 WHERE tax_type = ? AND id != ?");
-            $stmt->execute([$tax_type, $id]);
+            $stmt = $pdo->prepare("UPDATE taxes SET is_default = 0 WHERE tax_type = ? AND company_id = ? AND id != ?");
+            $stmt->execute([$tax_type, $companyId, $id]);
         }
 
         // Update tax
@@ -306,8 +308,8 @@ try {
 
 } catch (PDOException $e) {
     error_log("Taxes API error: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('Failed to process request. Please try again.');
-} catch (Exception $e) {
+    ApiResponse::serverError('Database Error: ' . $e->getMessage());
+} catch (Throwable $e) {
     error_log("Taxes API exception: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('An unexpected error occurred');
+    ApiResponse::serverError('System Error: ' . $e->getMessage());
 }

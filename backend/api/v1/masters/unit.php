@@ -11,13 +11,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/../../../config/db.php';
 require_once __DIR__ . '/../../../helpers/apiResponse.php';
-require_once __DIR__ . '/../../../helpers/validator.php';
+require_once __DIR__ . '/../../../helpers/tenant.php';
 require_once __DIR__ . '/../../../middleware/auth.php';
 
 $user = AuthMiddleware::authenticate();
 
 try {
     $pdo = getDBConnection();
+    $companyId = TenantHelper::getCompanyId($user);
     $method = $_SERVER['REQUEST_METHOD'];
 
     if ($method === 'GET') {
@@ -37,6 +38,7 @@ try {
 
         $where = ["status = 'active'"];
         $params = [];
+        TenantHelper::appendCompanyFilter($where, $params, $companyId, 'company_id');
 
         if ($search) {
             $where[] = "(name LIKE ? OR symbol LIKE ? OR description LIKE ?)";
@@ -81,12 +83,12 @@ try {
         $decimal_places = isset($input['decimal_places']) ? (int)$input['decimal_places'] : 2;
         $description = $input['description'] ?? null;
 
-        $stmt = $pdo->prepare("SELECT id FROM units WHERE name = ? AND status = 'active'");
-        $stmt->execute([$name]);
+        $stmt = $pdo->prepare("SELECT id FROM units WHERE name = ? AND company_id = ? AND status = 'active'");
+        $stmt->execute([$name, $companyId]);
         if ($stmt->fetch()) ApiResponse::validationError(['name' => ['Unit with this name already exists']]);
 
-        $stmt = $pdo->prepare("INSERT INTO units (name, symbol, unit_type, decimal_places, description) VALUES (?, ?, ?, ?, ?)");
-        $stmt->execute([$name, $symbol, $unit_type, $decimal_places, $description]);
+        $stmt = $pdo->prepare("INSERT INTO units (name, symbol, unit_type, decimal_places, description, company_id) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$name, $symbol, $unit_type, $decimal_places, $description, $companyId]);
         $unitId = $pdo->lastInsertId();
 
         $stmt = $pdo->prepare("SELECT * FROM units WHERE id = ?");
@@ -113,8 +115,8 @@ try {
         $decimal_places = isset($input['decimal_places']) ? (int)$input['decimal_places'] : $existingUnit['decimal_places'];
         $description = array_key_exists('description', $input) ? $input['description'] : $existingUnit['description'];
 
-        $stmt = $pdo->prepare("SELECT id FROM units WHERE name = ? AND id != ? AND status = 'active'");
-        $stmt->execute([$name, $id]);
+        $stmt = $pdo->prepare("SELECT id FROM units WHERE name = ? AND company_id = ? AND id != ? AND status = 'active'");
+        $stmt->execute([$name, $companyId, $id]);
         if ($stmt->fetch()) ApiResponse::validationError(['name' => ['Unit with this name already exists']]);
 
         $stmt = $pdo->prepare("UPDATE units SET name = ?, symbol = ?, unit_type = ?, decimal_places = ?, description = ? WHERE id = ?");
@@ -146,8 +148,8 @@ try {
 
 } catch (PDOException $e) {
     error_log("Units API error: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('Failed to process request');
-} catch (Exception $e) {
+    ApiResponse::serverError('Database Error: ' . $e->getMessage());
+} catch (Throwable $e) {
     error_log("Units API exception: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('An unexpected error occurred');
+    ApiResponse::serverError('System Error: ' . $e->getMessage());
 }
