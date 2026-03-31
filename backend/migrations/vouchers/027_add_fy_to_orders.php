@@ -5,8 +5,12 @@ class Migration_27_AddFyToOrders {
     public function __construct(PDO $pdo) { $this->pdo = $pdo; }
 
     public function up(): void {
-        // 1. Add financial_year_id column
-        $this->pdo->exec("ALTER TABLE orders ADD COLUMN financial_year_id INT NULL AFTER order_date");
+        // 1. Add financial_year_id column if missing
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND COLUMN_NAME = 'financial_year_id'");
+        $stmt->execute();
+        if ((int)$stmt->fetchColumn() === 0) {
+            $this->pdo->exec("ALTER TABLE orders ADD COLUMN financial_year_id INT NULL AFTER order_date");
+        }
         
         // 2. Update existing records with appropriate FY IDs based on date if possible
         // (This is a simplified backfill; in production, you'd match dates against financial_years table)
@@ -22,9 +26,13 @@ class Migration_27_AddFyToOrders {
         ");
 
         // 3. Update Unique Key
-        $this->pdo->exec("ALTER TABLE orders DROP INDEX uq_orders");
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'orders' AND INDEX_NAME = 'uq_orders'");
+        $stmt->execute();
+        if ((int)$stmt->fetchColumn() > 0) {
+            $this->pdo->exec("ALTER TABLE orders DROP INDEX uq_orders");
+        }
         $this->pdo->exec("ALTER TABLE orders ADD UNIQUE KEY uq_orders (order_type, order_no, company_id, financial_year_id)");
-        
+
         // 4. Add index for better filtering
         $this->pdo->exec("ALTER TABLE orders ADD INDEX idx_orders_fy (financial_year_id)");
     }

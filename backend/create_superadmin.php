@@ -8,6 +8,7 @@ require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/helpers/auth.php';
 
 try {
+    $pdo = getDBConnection();
     $email = 'admin@earnestminds.in';
     $password = 'Emts@123!';
     $name = 'Super Admin';

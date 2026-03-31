@@ -9,6 +9,13 @@ class Migration_28_FixItemCodeUnique {
 
     public function up(): void {
         try {
+            // Defensive: Ensure company_id exists in items table
+            $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'items' AND COLUMN_NAME = 'company_id'");
+            $stmt->execute();
+            if ((int)$stmt->fetchColumn() === 0) {
+                $this->pdo->exec("ALTER TABLE items ADD COLUMN company_id INT NULL AFTER id");
+            }
+
             // Drop the global unique index on item_code which prevents the same item_code across different companies.
             $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'items' AND INDEX_NAME = 'item_code'");
             $stmt->execute();

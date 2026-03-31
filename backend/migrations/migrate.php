@@ -142,6 +142,56 @@ switch ($command) {
         }
         break;
 
+    case 'fresh':
+        echo "WARNING: This will delete ALL data in the database. Are you sure? (y/n): ";
+        $handle = fopen("php://stdin", "r");
+        $line = fgets($handle);
+        if (trim(strtolower($line)) !== 'y') {
+            echo "Cancelled.\n";
+            exit;
+        }
+
+        echo "Dropping all tables...\n";
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+        $tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($tables as $table) {
+            $pdo->exec("DROP TABLE IF EXISTS `$table` ");
+        }
+        $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
+        echo "Tables dropped. Starting fresh migrations...\n";
+        
+        // After dropping, we need to create the migrations table again
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS migrations (
+                id          INT AUTO_INCREMENT PRIMARY KEY,
+                migration   VARCHAR(255) NOT NULL,
+                batch       INT NOT NULL DEFAULT 1,
+                ran_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_migration (migration)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        
+        // Now fall through or re-run the 'run' logic
+        $ran = []; // No migrations have run
+        $batch = 1;
+        $count = 0;
+        foreach ($all as $m) {
+            echo "Running: {$m['name']} ... ";
+            try {
+                $migration = loadMigration($m['file']);
+                $migration->up();
+                $stmt = $pdo->prepare("INSERT INTO migrations (migration, batch) VALUES (?, ?)");
+                $stmt->execute([$m['name'], $batch]);
+                echo "OK\n";
+                $count++;
+            } catch (Throwable $e) {
+                echo "FAILED\n  " . $e->getMessage() . "\n";
+                exit(1);
+            }
+        }
+        echo "Done. {$count} migrations ran from scratch.\n";
+        break;
+
     default:
         echo "Unknown command: $command\nUsage: php migrate.php [run|rollback|status]\n";
         exit(1);
