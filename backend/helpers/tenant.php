@@ -26,6 +26,30 @@ class TenantHelper {
         return (int)$user['company_id'];
     }
 
+    public static function getFinancialYearId(array $user, $requestedFyId = null): ?int {
+        // If passed explicitly via query/body
+        if ($requestedFyId !== null && $requestedFyId !== '') {
+            return (int)$requestedFyId;
+        }
+
+        // Check for custom header X-Financial-Year-Id
+        $headers = function_exists('getallheaders') ? getallheaders() : [];
+        if (isset($headers['X-Financial-Year-Id'])) {
+            return (int)$headers['X-Financial-Year-Id'];
+        }
+
+        return null;
+    }
+
+    public static function appendFinancialYearFilter(array &$where, array &$params, ?int $fyId, string $column = 'financial_year_id'): void {
+        if ($fyId === null || $fyId <= 0) {
+            return;
+        }
+
+        $where[] = $column . ' = ?';
+        $params[] = $fyId;
+    }
+
     public static function hasCompanyColumn(PDO $pdo, string $tableName): bool {
         static $cache = [];
 

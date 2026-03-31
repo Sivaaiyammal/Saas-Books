@@ -24,7 +24,8 @@ import {
   ShieldCheck,
   Building2,
   Wallet,
-  HardDrive
+  HardDrive,
+  Scissors
 } from 'lucide-react';
 import { authApi, FinancialYearOption, getSelectedFinancialYearId, getSelectedFinancialYearLabel, setSelectedFinancialYearId, setSelectedFinancialYearLabel, settingsApi, restoreAdminTokens } from '../services/api';
 
@@ -428,6 +429,18 @@ const Layout: React.FC<LayoutProps> = ({ onLogout }) => {
                       FY {fy.code}
                     </button>
                   ))}
+                  <div className="border-t border-slate-100 p-1">
+                    <button
+                      onClick={() => {
+                        navigate('/data/split');
+                        setIsFyOpen(false);
+                      }}
+                      className="w-full text-left px-2 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center justify-between"
+                    >
+                      <span>Split Data</span>
+                      <Scissors size={12} />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

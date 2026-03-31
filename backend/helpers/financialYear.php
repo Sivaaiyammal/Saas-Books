@@ -191,4 +191,96 @@ class FinancialYearHelper {
 
         return $status === 'closed';
     }
+
+    public static function calculateStockClosing(PDO $pdo, int $companyId, int $fyId): array {
+        // Query to get current stock levels for a specific FY and company
+        // Group by product_id
+        $stmt = $pdo->prepare("
+            SELECT 
+                product_id, 
+                SUM(quantity) as closing_balance
+            FROM stock_movement 
+            WHERE (company_id = ? OR company_id IS NULL)
+              AND financial_year_id = ?
+            GROUP BY product_id
+            HAVING closing_balance != 0
+        ");
+        $stmt->execute([$companyId, $fyId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public static function calculateLedgerClosing(PDO $pdo, int $companyId, int $fyId): array {
+        // Query to get current ledger balances for a specific FY and company (from voucher_entries)
+        // Group by ledger_id
+        $stmt = $pdo->prepare("
+            SELECT 
+                ve.ledger_id, 
+                SUM(CASE WHEN ve.dr_cr = 'Dr' THEN ve.amount ELSE -ve.amount END) as closing_balance
+            FROM voucher_entries ve
+            INNER JOIN vouchers v ON v.id = ve.voucher_id
+            WHERE v.company_id = ?
+              AND v.financial_year_id = ?
+            GROUP BY ve.ledger_id
+            HAVING closing_balance != 0
+        ");
+        $stmt->execute([$companyId, $fyId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public static function performSplit(PDO $pdo, int $companyId, int $oldFyId, string $newFyCode, string $startDate, string $endDate): int {
+        $pdo->beginTransaction();
+        try {
+            // 1. Create New Financial Year
+            $stmt = $pdo->prepare("
+                INSERT INTO financial_years (company_id, code, name, start_date, end_date, is_current, status)
+                VALUES (?, ?, ?, ?, ?, 0, 'open')
+            ");
+            $newFyName = "FY " . $newFyCode;
+            $stmt->execute([$companyId, $newFyCode, $newFyName, $startDate, $endDate]);
+            $newFyId = (int)$pdo->lastInsertId();
+
+            // 2. Fetch Closing Balances
+            $stockBalances = self::calculateStockClosing($pdo, $companyId, $oldFyId);
+            $ledgerBalances = self::calculateLedgerClosing($pdo, $companyId, $oldFyId);
+
+            // 3. Insert Opening Stock Movement
+            $smInsert = $pdo->prepare("
+                INSERT INTO stock_movement (product_id, quantity, type, reference, financial_year_id, company_id, created_at)
+                VALUES (?, ?, 'Opening', 'Split Opening', ?, ?, NOW())
+            ");
+            foreach ($stockBalances as $row) {
+                $smInsert->execute([$row['product_id'], $row['closing_balance'], $newFyId, $companyId]);
+            }
+
+            // 4. Insert Opening Ledger Balances (via specialized opening vouchers or entries)
+            // We'll create a single "Opening Balance" voucher for the entire year
+            $openingVoucherNo = "OB-" . $newFyCode; // e.g. OB-2025-26
+            $voucherInsert = $pdo->prepare("
+                INSERT INTO vouchers (company_id, voucher_type, voucher_no, voucher_date, financial_year_id, financial_year, status, created_at)
+                VALUES (?, 'Opening', ?, ?, ?, ?, 'posted', NOW())
+            ");
+            $voucherInsert->execute([$companyId, $openingVoucherNo, $startDate, $newFyId, $newFyCode]);
+            $voucherId = (int)$pdo->lastInsertId();
+
+            $veInsert = $pdo->prepare("
+                INSERT INTO voucher_entries (voucher_id, ledger_id, amount, dr_cr, description, created_at, financial_year_id)
+                VALUES (?, ?, ?, ?, 'Opening balance from split', NOW(), ?)
+            ");
+            foreach ($ledgerBalances as $row) {
+                $amount = abs($row['closing_balance']);
+                $drCr = $row['closing_balance'] > 0 ? 'Dr' : 'Cr';
+                $veInsert->execute([$voucherId, $row['ledger_id'], $amount, $drCr, $newFyId]);
+            }
+
+            // 5. Close the old financial year
+            $pdo->prepare("UPDATE financial_years SET status = 'closed', closed_at = NOW() WHERE id = ?")->execute([$oldFyId]);
+
+            $pdo->commit();
+            return $newFyId;
+
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            throw $e;
+        }
+    }
 }

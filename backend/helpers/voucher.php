@@ -12,13 +12,28 @@ class VoucherHelper {
      */
     public static function generateVoucherNo($pdo, $voucherType, $companyId = null, $startingNumber = 1, $voucherDate = null) {
         $prefix = self::getVoucherPrefix($voucherType);
-        [$fyStart, $fyEnd] = self::getFinancialYearRange($voucherDate);
+        
+        // Find the financial year ID for this date
+        $fyStmt = $pdo->prepare("SELECT id FROM financial_years WHERE company_id = ? AND ? BETWEEN start_date AND end_date LIMIT 1");
+        $fyStmt->execute([$companyId, $voucherDate ?? date('Y-m-d')]);
+        $fy = $fyStmt->fetch();
+        $fyId = $fy ? $fy['id'] : null;
 
         $sql = "SELECT voucher_no FROM vouchers
                 WHERE voucher_type = ?
-                AND voucher_no LIKE ?
-                AND voucher_date BETWEEN ? AND ?";
-        $params = [$voucherType, $prefix . '%', $fyStart, $fyEnd];
+                AND voucher_no LIKE ?";
+        $params = [$voucherType, $prefix . '%'];
+
+        if ($fyId) {
+            $sql .= " AND financial_year_id = ?";
+            $params[] = $fyId;
+        } else {
+            // Fallback to date range if Fy row is missing (backward compatibility during migration)
+            [$fyStart, $fyEnd] = self::getFinancialYearRange($voucherDate);
+            $sql .= " AND voucher_date BETWEEN ? AND ?";
+            $params[] = $fyStart;
+            $params[] = $fyEnd;
+        }
 
         if ($companyId) {
             $sql .= " AND company_id = ?";
@@ -71,13 +86,27 @@ class VoucherHelper {
     public static function generateOrderNo($pdo, $orderType, $companyId = null, $startingNumber = 1, $orderDate = null) {
         $voucherType = $orderType === 'Purchase' ? 'Purchase Order' : 'Sales Order';
         $prefix = self::getVoucherPrefix($voucherType);
-        [$fyStart, $fyEnd] = self::getFinancialYearRange($orderDate);
+        
+        // Find the financial year ID for this date
+        $fyStmt = $pdo->prepare("SELECT id FROM financial_years WHERE company_id = ? AND ? BETWEEN start_date AND end_date LIMIT 1");
+        $fyStmt->execute([$companyId, $orderDate ?? date('Y-m-d')]);
+        $fy = $fyStmt->fetch();
+        $fyId = $fy ? $fy['id'] : null;
 
         $sql = "SELECT order_no FROM orders
                 WHERE order_type = ?
-                AND order_no LIKE ?
-                AND order_date BETWEEN ? AND ?";
-        $params = [$orderType, $prefix . '%', $fyStart, $fyEnd];
+                AND order_no LIKE ?";
+        $params = [$orderType, $prefix . '%'];
+
+        if ($fyId) {
+            $sql .= " AND financial_year_id = ?";
+            $params[] = $fyId;
+        } else {
+            [$fyStart, $fyEnd] = self::getFinancialYearRange($orderDate);
+            $sql .= " AND order_date BETWEEN ? AND ?";
+            $params[] = $fyStart;
+            $params[] = $fyEnd;
+        }
 
         if ($companyId) {
             $sql .= " AND company_id = ?";

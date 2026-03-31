@@ -233,10 +233,12 @@ export const apiClient = async (endpoint: string, options: RequestInit = {}, _is
   const token = getAuthToken();
   const method = (options.method || 'GET').toUpperCase();
   const endpointWithFy = withFinancialYearParams(endpoint, method);
-  const headers = {
+  const fyId = getSelectedFinancialYearId();
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    ...options.headers,
+    ...(fyId ? { 'X-Financial-Year-Id': String(fyId) } : {}),
+    ...(options.headers as Record<string, string>),
   };
 
   try {
@@ -1014,6 +1016,12 @@ export const settingsApi = {
     return apiClient('/settings/financial_years.php', {
       method: 'PUT',
       body: JSON.stringify({ financial_year_id: financialYearId }),
+    });
+  },
+  async splitFinancialYear(data: { new_fy_code: string; start_date: string; end_date: string }): Promise<{ success: boolean; message: string; data?: { new_financial_year_id: number } }> {
+    return apiClient('/settings/split_fy.php', {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   },
   async saveGstSettings(data: any): Promise<{ success: boolean; message: string }> {
