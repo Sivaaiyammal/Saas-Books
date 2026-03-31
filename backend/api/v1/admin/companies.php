@@ -411,11 +411,11 @@ try {
         $db->rollBack();
     }
     error_log('Admin companies API error: ' . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('Failed to process admin request');
-} catch (Exception $e) {
+    ApiResponse::serverError('Database Error: ' . $e->getMessage());
+} catch (Throwable $e) {
     if ($db && $db->inTransaction()) {
         $db->rollBack();
     }
     error_log('Admin companies API exception: ' . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('An unexpected error occurred');
+    ApiResponse::serverError('System Error: ' . $e->getMessage());
 }
