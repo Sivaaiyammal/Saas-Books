@@ -201,8 +201,8 @@ class VoucherHelper {
     public static function createBillAllocation($pdo, $data) {
         $stmt = $pdo->prepare("
             INSERT INTO bill_allocations
-            (ledger_id, voucher_entry_id, bill_no, bill_date, amount, type, pending_amount, reference_voucher_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (ledger_id, voucher_entry_id, bill_no, bill_date, amount, type, pending_amount, reference_voucher_id, financial_year_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
 
         $stmt->execute([
@@ -213,7 +213,8 @@ class VoucherHelper {
             $data['amount'],
             $data['type'] ?? 'New',
             $data['pending_amount'] ?? $data['amount'],
-            $data['reference_voucher_id'] ?? null
+            $data['reference_voucher_id'] ?? null,
+            $data['financial_year_id'] ?? null
         ]);
 
         return $pdo->lastInsertId();

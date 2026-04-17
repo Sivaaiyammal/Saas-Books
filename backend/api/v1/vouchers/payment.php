@@ -389,20 +389,28 @@ try {
             // Generate voucher number
             $voucherNo = VoucherHelper::generateVoucherNo($pdo, 'Payment', $companyId, 1, $voucherDate);
 
+            // Get Financial Year
+            $resolvedFy = FinancialYearHelper::ensureYear($pdo, $companyId, $voucherDate);
+            $fyId = (int)$resolvedFy['id'];
+            $fyCode = $resolvedFy['code'];
+
             // Create voucher
             $stmt = $pdo->prepare("
                 INSERT INTO vouchers (
                     company_id, voucher_type, voucher_no, voucher_date,
+                    financial_year_id, financial_year,
                     party_ledger_id, total_amount,
                     reference_no, narration, payment_mode, status, created_by
                 ) VALUES (
-                    ?, 'Payment', ?, ?, ?, ?, ?, ?, ?, 'posted', ?
+                    ?, 'Payment', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'posted', ?
                 )
             ");
             $stmt->execute([
                 $companyId,
                 $voucherNo,
                 $voucherDate,
+                $fyId,
+                $fyCode,
                 $input['party_ledger_id'],
                 $totalSettled,
                 $input['reference_no'] ?? null,
@@ -415,35 +423,35 @@ try {
             // Create accounting entries
             // Dr: Vendor Account (reduces payable)
             $stmt = $pdo->prepare("
-                INSERT INTO voucher_entries (voucher_id, ledger_id, dr_cr, amount)
-                VALUES (?, ?, 'Dr', ?)
+                INSERT INTO voucher_entries (voucher_id, ledger_id, dr_cr, amount, financial_year_id)
+                VALUES (?, ?, 'Dr', ?, ?)
             ");
-            $stmt->execute([$voucherId, $input['party_ledger_id'], $totalSettled]);
+            $stmt->execute([$voucherId, $input['party_ledger_id'], $totalSettled, $fyId]);
             $vendorEntryId = $pdo->lastInsertId();
 
             // Cr: Cash/Bank Account (money going out)
             $stmt = $pdo->prepare("
-                INSERT INTO voucher_entries (voucher_id, ledger_id, dr_cr, amount)
-                VALUES (?, ?, 'Cr', ?)
+                INSERT INTO voucher_entries (voucher_id, ledger_id, dr_cr, amount, financial_year_id)
+                VALUES (?, ?, 'Cr', ?, ?)
             ");
-            $stmt->execute([$voucherId, $input['paid_from'], $amount]);
+            $stmt->execute([$voucherId, $input['paid_from'], $amount, $fyId]);
 
             // Cr: TDS Payable (if TDS deducted)
             if ($tdsAmount > 0) {
                 $stmt = $pdo->prepare("
-                    INSERT INTO voucher_entries (voucher_id, ledger_id, dr_cr, amount)
-                    VALUES (?, ?, 'Cr', ?)
+                    INSERT INTO voucher_entries (voucher_id, ledger_id, dr_cr, amount, financial_year_id)
+                    VALUES (?, ?, 'Cr', ?, ?)
                 ");
-                $stmt->execute([$voucherId, $tdsLedgerId, $tdsAmount]);
+                $stmt->execute([$voucherId, $tdsLedgerId, $tdsAmount, $fyId]);
             }
 
             // Cr: Discount Received (if discount received)
             if ($discountAmount > 0) {
                 $stmt = $pdo->prepare("
-                    INSERT INTO voucher_entries (voucher_id, ledger_id, dr_cr, amount)
-                    VALUES (?, ?, 'Cr', ?)
+                    INSERT INTO voucher_entries (voucher_id, ledger_id, dr_cr, amount, financial_year_id)
+                    VALUES (?, ?, 'Cr', ?, ?)
                 ");
-                $stmt->execute([$voucherId, $discountLedgerId, $discountAmount]);
+                $stmt->execute([$voucherId, $discountLedgerId, $discountAmount, $fyId]);
             }
 
             // Process bill adjustments
@@ -490,8 +498,9 @@ try {
                     'bill_no' => $voucherNo,
                     'bill_date' => $voucherDate,
                     'amount' => $onAccountAmount,
-                    'type' => 'On Account',
-                    'pending_amount' => $onAccountAmount
+                    'type' => $residualType,
+                    'pending_amount' => $onAccountAmount,
+                    'financial_year_id' => $fyId
                 ]);
             }
 
@@ -817,7 +826,7 @@ try {
 
 } catch (PDOException $e) {
     error_log("Payment API error: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('Database error occurred');
+    ApiResponse::serverError('Database Error: ' . $e->getMessage());
 } catch (Exception $e) {
     error_log("Payment API exception: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
     ApiResponse::serverError($e->getMessage());

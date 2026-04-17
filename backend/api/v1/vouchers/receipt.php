@@ -381,6 +381,11 @@ try {
                 ? $input['voucher_no']
                 : VoucherHelper::generateVoucherNo($pdo, 'Receipt', $companyId, 1, $voucherDate);
 
+            // Get Financial Year
+            $resolvedFy = FinancialYearHelper::ensureYear($pdo, $companyId, $input['voucher_date']);
+            $fyId = (int)$resolvedFy['id'];
+            $fyCode = $resolvedFy['code'];
+
             // Calculate total (with optional deductions)
             $tdsAmount = floatval($input['tds_amount'] ?? 0);
             $discountAmount = floatval($input['discount_amount'] ?? 0);
@@ -390,15 +395,18 @@ try {
             // Create voucher
             $stmt = $pdo->prepare("
                 INSERT INTO vouchers (
-                    company_id, voucher_type, voucher_no, voucher_date, reference_no,
-                    party_ledger_id, total_amount, narration, receipt_mode, status, created_by
-                ) VALUES (?, 'Receipt', ?, ?, ?, ?, ?, ?, ?, 'posted', ?)
+                    company_id, voucher_type, voucher_no, voucher_date,
+                    financial_year_id, financial_year,
+                    reference_no, party_ledger_id, total_amount, narration, receipt_mode, status, created_by
+                ) VALUES (?, 'Receipt', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'posted', ?)
             ");
 
             $stmt->execute([
                 $companyId,
                 $voucherNo,
                 $input['voucher_date'],
+                $fyId,
+                $fyCode,
                 $input['reference_no'] ?? null,
                 $input['party_ledger_id'],
                 $totalSettled,
@@ -411,8 +419,8 @@ try {
 
             // Create accounting entries
             $stmtEntry = $pdo->prepare("
-                INSERT INTO voucher_entries (voucher_id, ledger_id, amount, dr_cr, description)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO voucher_entries (voucher_id, ledger_id, amount, dr_cr, description, financial_year_id)
+                VALUES (?, ?, ?, ?, ?, ?)
             ");
 
             // 1. Debit: Cash/Bank Account
@@ -421,7 +429,8 @@ try {
                 $input['received_in'],
                 $totalReceived,
                 'Dr',
-                'Receipt from ' . $partyLedger['name']
+                'Receipt from ' . $partyLedger['name'],
+                $fyId
             ]);
 
             // 2. Debit: TDS (if applicable)
@@ -431,7 +440,8 @@ try {
                     $input['tds_ledger_id'],
                     $tdsAmount,
                     'Dr',
-                    'TDS deducted by ' . $partyLedger['name']
+                    'TDS deducted by ' . $partyLedger['name'],
+                    $fyId
                 ]);
             }
 
@@ -442,7 +452,8 @@ try {
                     $input['discount_ledger_id'],
                     $discountAmount,
                     'Dr',
-                    'Discount allowed to ' . $partyLedger['name']
+                    'Discount allowed to ' . $partyLedger['name'],
+                    $fyId
                 ]);
             }
 
@@ -452,7 +463,8 @@ try {
                 $input['party_ledger_id'],
                 $totalSettled,
                 'Cr',
-                'Payment received'
+                'Payment received',
+                $fyId
             ]);
 
             $partyEntryId = $pdo->lastInsertId();
@@ -499,7 +511,8 @@ try {
                             'amount' => $adjAmount,
                             'type' => 'Against',
                             'pending_amount' => 0,
-                            'reference_voucher_id' => $originalBill['original_voucher_id']
+                            'reference_voucher_id' => $originalBill['original_voucher_id'],
+                            'financial_year_id' => $fyId
                         ]);
                     }
                 }
@@ -516,7 +529,8 @@ try {
                     'bill_date' => $input['voucher_date'],
                     'amount' => $onAccountAmount,
                     'type' => $residualType,
-                    'pending_amount' => $onAccountAmount
+                    'pending_amount' => $onAccountAmount,
+                    'financial_year_id' => $fyId
                 ]);
             }
 
@@ -989,7 +1003,7 @@ try {
 
 } catch (PDOException $e) {
     error_log("Receipt API error: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('Database error occurred');
+    ApiResponse::serverError('Database Error: ' . $e->getMessage());
 } catch (Exception $e) {
     error_log("Receipt API exception: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
     ApiResponse::serverError($e->getMessage());

@@ -393,8 +393,9 @@ try {
                 INSERT INTO voucher_items (
                     voucher_id, product_id, item_name, colour,
                     quantity, unit_id, rate, discount_percent, discount_amount,
-                    tax_id, tax_percent, tax_amount, amount, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    tax_id, tax_percent, tax_amount, amount, description,
+                    financial_year_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($processedItems as $item) {
@@ -434,7 +435,8 @@ try {
                         $item['quantity'],
                         $voucherNo,
                         $user['id'],
-                        'Purchase from ' . $vendorLedger['name']
+                        'Purchase from ' . $vendorLedger['name'],
+                        (int)$resolvedFy['id']
                     ]);
                 }
 
@@ -463,8 +465,8 @@ try {
 
             // Create accounting entries (double-entry)
             $stmtEntry = $pdo->prepare("
-                INSERT INTO voucher_entries (voucher_id, ledger_id, amount, dr_cr, description)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO voucher_entries (voucher_id, ledger_id, amount, dr_cr, description, financial_year_id)
+                VALUES (?, ?, ?, ?, ?, ?)
             ");
 
             // Get Purchase ledger
@@ -503,15 +505,15 @@ try {
                     $name = strtoupper($tl['name']);
                     // Look for Input GST ledgers
                     if ($totalCgst > 0 && (strpos($name, 'CGST INPUT') !== false || strpos($name, 'CGST') !== false)) {
-                        $stmtEntry->execute([$voucherId, $tl['id'], $totalCgst, 'Dr', 'CGST Input Credit']);
+                        $stmtEntry->execute([$voucherId, $tl['id'], $totalCgst, 'Dr', 'CGST Input Credit', (int)$resolvedFy['id']]);
                         $totalCgst = 0; // Prevent duplicate entry
                     }
                     if ($totalSgst > 0 && (strpos($name, 'SGST INPUT') !== false || strpos($name, 'SGST') !== false)) {
-                        $stmtEntry->execute([$voucherId, $tl['id'], $totalSgst, 'Dr', 'SGST Input Credit']);
+                        $stmtEntry->execute([$voucherId, $tl['id'], $totalSgst, 'Dr', 'SGST Input Credit', (int)$resolvedFy['id']]);
                         $totalSgst = 0;
                     }
                     if ($totalIgst > 0 && (strpos($name, 'IGST INPUT') !== false || strpos($name, 'IGST') !== false)) {
-                        $stmtEntry->execute([$voucherId, $tl['id'], $totalIgst, 'Dr', 'IGST Input Credit']);
+                        $stmtEntry->execute([$voucherId, $tl['id'], $totalIgst, 'Dr', 'IGST Input Credit', (int)$resolvedFy['id']]);
                         $totalIgst = 0;
                     }
                 }
@@ -1094,7 +1096,7 @@ try {
 
 } catch (PDOException $e) {
     error_log("Purchase API error: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('Database error occurred');
+    ApiResponse::serverError('Database Error: ' . $e->getMessage());
 } catch (Exception $e) {
     error_log("Purchase API exception: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
     ApiResponse::serverError($e->getMessage());

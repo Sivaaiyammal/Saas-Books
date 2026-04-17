@@ -536,8 +536,9 @@ try {
                 INSERT INTO voucher_items (
                     voucher_id, product_id, item_name, colour,
                     quantity, unit_id, rate, discount_percent, discount_amount,
-                    tax_id, tax_percent, cgst, sgst, igst, tax_amount, amount, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    tax_id, tax_percent, cgst, sgst, igst, tax_amount, amount, description,
+                    financial_year_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ");
 
             foreach ($processedItems as $item) {
@@ -558,7 +559,8 @@ try {
                     $item['igst'],
                     $item['tax_amount'],
                     $item['amount'],
-                    $item['description']
+                    $item['description'],
+                    (int)$resolvedFy['id']
                 ]);
 
                 // Reduce stock only when NOT billing from a Delivery Note
@@ -610,8 +612,8 @@ try {
 
             // Create accounting entries (double-entry)
             $stmtEntry = $pdo->prepare("
-                INSERT INTO voucher_entries (voucher_id, ledger_id, amount, dr_cr, description)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO voucher_entries (voucher_id, ledger_id, amount, dr_cr, description, financial_year_id)
+                VALUES (?, ?, ?, ?, ?, ?)
             ");
 
             // 1. Debit: Party (Customer) - Full amount
@@ -620,7 +622,8 @@ try {
                 $input['party_ledger_id'],
                 $grandTotal,
                 'Dr',
-                'Sales to customer'
+                'Sales to customer',
+                (int)$resolvedFy['id']
             ]);
 
             // Get Sales ledger
@@ -658,13 +661,13 @@ try {
                 foreach ($taxLedgers as $tl) {
                     $name = strtoupper($tl['name']);
                     if ($totalCgst > 0 && strpos($name, 'CGST') !== false) {
-                        $stmtEntry->execute([$voucherId, $tl['id'], $totalCgst, 'Cr', 'CGST Output']);
+                        $stmtEntry->execute([$voucherId, $tl['id'], $totalCgst, 'Cr', 'CGST Output', (int)$resolvedFy['id']]);
                     }
                     if ($totalSgst > 0 && strpos($name, 'SGST') !== false) {
-                        $stmtEntry->execute([$voucherId, $tl['id'], $totalSgst, 'Cr', 'SGST Output']);
+                        $stmtEntry->execute([$voucherId, $tl['id'], $totalSgst, 'Cr', 'SGST Output', (int)$resolvedFy['id']]);
                     }
                     if ($totalIgst > 0 && strpos($name, 'IGST') !== false) {
-                        $stmtEntry->execute([$voucherId, $tl['id'], $totalIgst, 'Cr', 'IGST Output']);
+                        $stmtEntry->execute([$voucherId, $tl['id'], $totalIgst, 'Cr', 'IGST Output', (int)$resolvedFy['id']]);
                     }
                 }
             }
@@ -1145,7 +1148,8 @@ try {
                     $item['igst'],
                     $item['tax_amount'],
                     $item['amount'],
-                    $item['description']
+                    $item['description'],
+                    (int)$resolvedFy['id']
                 ]);
 
                 // Reduce stock only when NOT billing from a Delivery Note
@@ -1205,7 +1209,8 @@ try {
                 $input['party_ledger_id'],
                 $grandTotal,
                 'Dr',
-                'Sales to customer'
+                'Sales to customer',
+                (int)$resolvedFy['id']
             ]);
 
             // Get Sales ledger
@@ -1413,7 +1418,7 @@ try {
 
 } catch (PDOException $e) {
     error_log("Sales API error: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
-    ApiResponse::serverError('Database error occurred');
+    ApiResponse::serverError('Database Error: ' . $e->getMessage());
 } catch (Exception $e) {
     error_log("Sales API exception: " . $e->getMessage(), 3, __DIR__ . '/../../../logs/api_error.log');
     ApiResponse::serverError($e->getMessage());
